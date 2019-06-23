@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 simplelog = "^0.5.0"
+hyper = "0.12"
