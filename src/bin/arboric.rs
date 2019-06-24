@@ -1,5 +1,6 @@
 extern crate hyper;
 
+use futures::future;
 use hyper::rt::{self, Future};
 use hyper::service::service_fn;
 use hyper::{Body, Client, Request, Response, Server};
@@ -16,8 +17,9 @@ fn proxy(_req: Request<Body>) -> BoxFut {
         .unwrap();
 
     let client = Client::new();
+    let fut = client.get(uri).and_then(|res| future::ok(res));
 
-    Box::new(client.get(uri))
+    Box::new(fut)
 }
 
 fn do_get() {
