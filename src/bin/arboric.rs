@@ -4,7 +4,7 @@ use futures::future;
 use hyper::rt::{self, Future};
 use hyper::service::service_fn;
 use hyper::{Body, Client, Request, Response, Server};
-use log::debug;
+use log::{debug, warn};
 use simplelog::{LevelFilter, SimpleLogger};
 use std::error::Error;
 
@@ -17,7 +17,16 @@ fn proxy(_req: Request<Body>) -> BoxFut {
         .unwrap();
 
     let client = Client::new();
-    let fut = client.get(uri).and_then(|res| future::ok(res));
+    let fut = client
+        .get(uri)
+        .and_then(|res| {
+            debug!("res.status => {}", res.status());
+            future::ok(res)
+        })
+        .map_err(|err| {
+            warn!("{}", err);
+            err
+        });
 
     Box::new(fut)
 }
