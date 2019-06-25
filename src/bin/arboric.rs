@@ -1,9 +1,9 @@
 extern crate hyper;
 
 use futures::future;
-use hyper::rt::{self, Future};
+use hyper::rt::Future;
 use hyper::service::service_fn;
-use hyper::{Body, Client, Request, Response, Server};
+use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
 use log::{debug, warn};
 use simplelog::{LevelFilter, SimpleLogger};
 use std::error::Error;
@@ -11,16 +11,27 @@ use std::error::Error;
 // Just a simple type alias
 type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
-fn proxy(_req: Request<Body>) -> BoxFut {
-    let uri = "http://localhost:4000/graphql?query={tweets{id}}"
-        .parse()
+fn do_get(req: Request<Body>) -> BoxFut {
+    let req_uri = req.uri();
+    debug!("req_uri => {}", req_uri);
+
+    let params = req.uri().query().unwrap();
+    let pandq = format!("/graphql?{}", params);
+
+    let uri = Uri::builder()
+        .scheme("http")
+        .authority("localhost:4000")
+        .path_and_query(&pandq[..])
+        .build()
         .unwrap();
+
+    debug!("uri => {}", uri);
 
     let client = Client::new();
     let fut = client
         .get(uri)
         .and_then(|res| {
-            debug!("res.status => {}", res.status());
+            debug!("GET /localhost:4000 => {}", res.status());
             future::ok(res)
         })
         .map_err(|err| {
@@ -31,31 +42,26 @@ fn proxy(_req: Request<Body>) -> BoxFut {
     Box::new(fut)
 }
 
-fn do_get() {
-    rt::run(rt::lazy(|| {
-        let uri = "http://localhost:4000/graphql?query={tweets{id}}"
-            .parse()
-            .unwrap();
+fn do_post(_req: Request<Body>) -> BoxFut {
+    let mut response = Response::new(Body::empty());
+    *response.status_mut() = StatusCode::NOT_FOUND;
+    Box::new(future::ok(response))
+}
 
-        let client = Client::new();
-
-        client
-            .get(uri)
-            .map(|res| {
-                let s = format!("*** Response: {}", res.status());
-                debug!("{}", s);
-            })
-            .map_err(|err| {
-                let s = format!("*** Error: {}", err);
-                debug!("{}", s);
-            })
-    }));
+fn proxy(req: Request<Body>) -> BoxFut {
+    match req.method() {
+        &Method::GET => do_get(req),
+        &Method::POST => do_post(req),
+        _ => {
+            let mut response = Response::new(Body::empty());
+            *response.status_mut() = StatusCode::NOT_FOUND;
+            Box::new(future::ok(response))
+        }
+    }
 }
 
 fn main() -> Result<(), Box<Error>> {
     let _ = SimpleLogger::init(LevelFilter::Debug, simplelog::Config::default());
-
-    do_get();
 
     // This is our socket address...
     let addr = ([127, 0, 0, 1], 3000).into();
