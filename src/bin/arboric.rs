@@ -42,10 +42,20 @@ fn do_get(req: Request<Body>) -> BoxFut {
     Box::new(fut)
 }
 
-fn do_post(_req: Request<Body>) -> BoxFut {
-    let mut response = Response::new(Body::empty());
-    *response.status_mut() = StatusCode::NOT_FOUND;
-    Box::new(future::ok(response))
+fn do_post(req: Request<Body>) -> BoxFut {
+    let req_uri = req.uri();
+    debug!("req_uri => {}", req_uri);
+
+    let uri: hyper::Uri = "http://localhost:4000/graphql".parse().unwrap();
+    debug!("uri => {}", uri);
+
+    let request = Request::post(uri)
+        .header("Content-Type", "application/graphql")
+        .body(Body::from("{tweets{id}}"))
+        .unwrap();
+
+    let client = Client::new();
+    Box::new(client.request(request))
 }
 
 fn proxy(req: Request<Body>) -> BoxFut {
