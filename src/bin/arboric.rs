@@ -1,7 +1,7 @@
 extern crate hyper;
 
 use futures::future;
-use hyper::rt::Future;
+use hyper::rt::{Future, Stream};
 use hyper::service::service_fn;
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
 use log::{debug, warn};
@@ -49,10 +49,14 @@ fn do_post(req: Request<Body>) -> BoxFut {
     let uri: hyper::Uri = "http://localhost:4000/graphql".parse().unwrap();
     debug!("uri => {}", uri);
 
-    let request = Request::post(uri)
+    debug!("{:?}", req.body());
+
+    let mut request = Request::post(uri)
         .header("Content-Type", "application/graphql")
-        .body(Body::from("{tweets{id}}"))
+        .body(Body::empty())
         .unwrap();
+
+    *request.body_mut() = req.into_body();
 
     let client = Client::new();
     Box::new(client.request(request))
