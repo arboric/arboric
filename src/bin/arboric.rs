@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<Error>> {
     log_config.thread = Some(log::Level::Debug);
     let _ = SimpleLogger::init(LevelFilter::Debug, log_config);
 
-    let proxy = arboric::Proxy{};
+    let proxy = arboric::Proxy {};
     debug!("{:?}", proxy);
 
     proxy.run();
