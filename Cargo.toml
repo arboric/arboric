@@ -6,6 +6,6 @@ edition = "2018"
 
 [dependencies]
 log = "0.4"
-simplelog = "^0.5.0"
+simplelog = "^0.6.0"
 hyper = "0.12"
 futures = "0.1"
