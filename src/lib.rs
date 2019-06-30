@@ -1,38 +1,53 @@
 /// The arboric library
 use futures::future;
+use http::header::HeaderMap;
 use hyper::rt::Future;
-use hyper::service::service_fn;
+use hyper::service::{NewService, Service};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
 use log::{debug, warn};
-
-const API_URI: &str = "http://localhost:3000/graphql";
 
 // Just a simple type alias
 type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
 /// The main Proxy
 #[derive(Debug)]
-pub struct Proxy {}
+pub struct Proxy {
+    api_uri: String,
+}
 
-impl Proxy {
-    pub fn new() -> Proxy {
-        Proxy {}
+pub struct ProxyService {
+    api_uri: String,
+}
+
+impl ProxyService {
+
+    fn forward_headers<T>(request: &Request<T>, header_map: &mut HeaderMap) {
+        debug!("Got {} headers", header_map.iter().count());
+        for (key, value) in request.headers().iter() {
+            if key != "host" {
+                header_map.append(key, value.into());
+                debug!("Forwarded {} => {:?}", key, value);
+            } else {
+                debug!("Ignored {} => {:?}", key, value);
+            }
+        }
     }
 
-    fn do_get(req: Request<Body>) -> BoxFut {
+    fn do_get(&self, req: Request<Body>) -> BoxFut {
         let req_uri = req.uri();
         debug!("req_uri => {}", req_uri);
 
+        let api_uri: Uri = self.api_uri.parse().unwrap();
+        let authority = api_uri.authority_part().unwrap();
+        let scheme = api_uri.scheme_str().unwrap();
         let params = req.uri().query().unwrap();
         let pandq = format!("/graphql?{}", params);
-
         let uri = Uri::builder()
-            .scheme("http")
-            .authority("localhost:4000")
+            .scheme(scheme)
+            .authority(authority.as_str())
             .path_and_query(&pandq[..])
             .build()
             .unwrap();
-
         debug!("uri => {}", uri);
 
         let client = Client::new();
@@ -46,34 +61,40 @@ impl Proxy {
                 warn!("{}", err);
                 err
             });
-
         Box::new(fut)
     }
 
-    fn do_post(req: Request<Body>) -> BoxFut {
+    fn do_post(&self, req: Request<Body>) -> BoxFut {
         let req_uri = req.uri();
         debug!("req_uri => {}", req_uri);
 
-        let uri: hyper::Uri = API_URI.parse().unwrap();
+        let uri: hyper::Uri = self.api_uri.parse().unwrap();
         debug!("uri => {}", uri);
 
         debug!("{:?}", req.body());
 
-        let mut request = Request::post(uri)
-            .header("Content-Type", "application/graphql")
-            .body(Body::empty())
-            .unwrap();
+        let mut request = Request::post(uri).body(Body::empty()).unwrap();
 
+        ProxyService::forward_headers(&req, request.headers_mut());
         *request.body_mut() = req.into_body();
 
         let client = Client::new();
         Box::new(client.request(request))
     }
 
-    fn proxy_service(req: Request<Body>) -> BoxFut {
+}
+
+
+impl Service for ProxyService {
+    type ReqBody = Body;
+    type ResBody = Body;
+    type Error = hyper::Error;
+    type Future = BoxFut;
+
+    fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
         match req.method() {
-            &Method::GET => Self::do_get(req),
-            &Method::POST => Self::do_post(req),
+            &Method::GET => self.do_get(req),
+            &Method::POST => self.do_post(req),
             _ => {
                 let mut response = Response::new(Body::empty());
                 *response.status_mut() = StatusCode::NOT_FOUND;
@@ -81,12 +102,40 @@ impl Proxy {
             }
         }
     }
+}
 
-    pub fn run(&self) {
+impl NewService for Proxy {
+    type ReqBody = Body;
+    type ResBody = Body;
+    type Error = hyper::Error;
+    type InitError = hyper::Error;
+    type Future = Box<Future<Item = Self::Service, Error = Self::InitError> + Send>;
+    type Service = ProxyService;
+    fn new_service(&self) -> Self::Future {
+        Box::new(future::ok(ProxyService {
+            api_uri: self.api_uri.clone(),
+        }))
+    }
+}
+
+
+impl Proxy {
+    pub fn new<S>(api_uri: S) -> Proxy
+    where
+        S: Into<String>,
+    {
+        Proxy {
+            api_uri: api_uri.into(),
+        }
+    }
+
+    pub fn run(self) {
         // This is our socket address...
         let addr = ([127, 0, 0, 1], 4000).into();
-        let server = Server::bind(&addr)
-            .serve(|| service_fn(Self::proxy_service))
+
+        let bound = Server::bind(&addr);
+        let server = bound
+            .serve(self)
             .map_err(|e| eprintln!("server error: {}", e));
 
         // Run this server for... forever!
