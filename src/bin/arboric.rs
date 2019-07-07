@@ -7,7 +7,7 @@ use std::env;
 use std::error::Error;
 const API_URI: &str = "http://localhost:3000/graphql";
 
-const DEFAULT_LOG_LEVEL: LevelFilter = LevelFilter::Debug;
+const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Debug;
 
 fn main() -> Result<(), Box<Error>> {
     initialize_logging();
@@ -31,13 +31,14 @@ fn initialize_logging() {
 
 fn get_env_log_level_filter() -> simplelog::LevelFilter {
     if let Ok(val) = env::var("ARBORIC_LOG") {
+        println!("Using {} log level", &val);
         match val.to_lowercase().as_str() {
-            "debug" => LevelFilter::Debug,
-            "warn" => LevelFilter::Warn,
+            "info" => LevelFilter::Info,
             "trace" => LevelFilter::Trace,
-            _ => DEFAULT_LOG_LEVEL,
+            "warn" => LevelFilter::Warn,
+            _ => DEBUG_LEVELFILTER,
         }
     } else {
-        DEFAULT_LOG_LEVEL
+        DEBUG_LEVELFILTER
     }
 }
