@@ -1,10 +1,14 @@
-/// The arboric library
+
 use futures::future;
 use http::header::HeaderMap;
+/// The arboric library
+use log::{debug, info, trace, warn};
+use hyper::client::ResponseFuture;
 use hyper::rt::Future;
 use hyper::service::{NewService, Service};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
-use log::{debug, warn};
+
+mod arboric;
 
 // Just a simple type alias
 type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
@@ -15,39 +19,41 @@ pub struct Proxy {
     api_uri: String,
 }
 
+#[derive(Debug)]
 pub struct ProxyService {
     api_uri: String,
 }
 
 impl ProxyService {
 
-    fn forward_headers<T>(request: &Request<T>, header_map: &mut HeaderMap) {
+    fn forward_headers<T>(request: &Request<T>, header_map: &mut HeaderMap)
+    where
+        T: std::fmt::Debug,
+    {
+        trace!("forward_headers({:?}, {:?})", &request, &header_map);
+        Self::copy_headers(request.headers(), header_map);
+    }
+
+    fn copy_headers(inbound_headers: &HeaderMap, header_map: &mut HeaderMap) {
         debug!("Got {} headers", header_map.iter().count());
-        for (key, value) in request.headers().iter() {
+        for (key, value) in inbound_headers.iter() {
             if key != "host" {
                 header_map.append(key, value.into());
-                debug!("Forwarded {} => {:?}", key, value);
+                debug!("Forwarding {}: {:?}", key, value);
             } else {
-                debug!("Ignored {} => {:?}", key, value);
+                debug!("Ignoring {}: {:?} header", key, value);
             }
         }
     }
+
 
     fn do_get(&self, req: Request<Body>) -> BoxFut {
         let req_uri = req.uri();
         debug!("req_uri => {}", req_uri);
 
-        let api_uri: Uri = self.api_uri.parse().unwrap();
-        let authority = api_uri.authority_part().unwrap();
-        let scheme = api_uri.scheme_str().unwrap();
-        let params = req.uri().query().unwrap();
-        let pandq = format!("/graphql?{}", params);
-        let uri = Uri::builder()
-            .scheme(scheme)
-            .authority(authority.as_str())
-            .path_and_query(&pandq[..])
-            .build()
-            .unwrap();
+        // TODO arboric::log_get(&req);
+
+        let uri = self.compute_get_uri(&req);
         debug!("uri => {}", uri);
 
         let client = Client::new();
@@ -64,26 +70,52 @@ impl ProxyService {
         Box::new(fut)
     }
 
-    fn do_post(&self, req: Request<Body>) -> BoxFut {
-        let req_uri = req.uri();
+    fn compute_get_uri(&self, req: &Request<Body>) -> Uri {
+        let api_uri: Uri = self.api_uri.parse().unwrap();
+        let authority = api_uri.authority_part().unwrap();
+        let scheme = api_uri.scheme_str().unwrap();
+        let params = req.uri().query().unwrap();
+        let pandq = format!("/graphql?{}", params);
+        Uri::builder()
+            .scheme(scheme)
+            .authority(authority.as_str())
+            .path_and_query(&pandq[..])
+            .build()
+            .unwrap()
+    }
+
+    fn do_post(&self, inbound: Request<Body>) -> Box<impl Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+        trace!("do_post({:?}, {:?})", &self, &inbound);
+        let req_uri = inbound.uri();
         debug!("req_uri => {}", req_uri);
 
         let uri: hyper::Uri = self.api_uri.parse().unwrap();
         debug!("uri => {}", uri);
 
-        debug!("{:?}", req.body());
+        let (parts, body) = inbound.into_parts();
 
-        let mut request = Request::post(uri).body(Body::empty()).unwrap();
+        trace!("log_post({:?})", &body);
 
-        ProxyService::forward_headers(&req, request.headers_mut());
-        *request.body_mut() = req.into_body();
+        use futures::stream::Stream;
+        let concat = body.concat2();
+
+        trace!("concat => {:?}", concat);
+        let s = concat.map(move |chunk| {
+            trace!("chunk => {:?}", &chunk);
+            let v = chunk.to_vec();
+            let s = String::from_utf8_lossy(&v).to_string();
+            debug!("s => {:?}", &s);
+            arboric::log_post(&s);
+            s
+        }).into_stream();
+        let mut r = Request::post(&uri).body(Body::wrap_stream(s)).unwrap();
+        ProxyService::copy_headers(&parts.headers, r.headers_mut());
 
         let client = Client::new();
-        Box::new(client.request(request))
+        Box::new(client.request(r))
     }
 
 }
-
 
 impl Service for ProxyService {
     type ReqBody = Body;
@@ -92,10 +124,19 @@ impl Service for ProxyService {
     type Future = BoxFut;
 
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
+        trace!("call({:?}, {:?})", &self, &req);
+        trace!("req.method() => {:?}", &req.method());
         match req.method() {
-            &Method::GET => self.do_get(req),
-            &Method::POST => self.do_post(req),
+            &Method::GET => {
+                trace!("about to call do_get()...");
+                self.do_get(req)
+            }
+            &Method::POST => {
+                trace!("about to call do_post()...");
+                self.do_post(req)
+            }
             _ => {
+                trace!("No match!");
                 let mut response = Response::new(Body::empty());
                 *response.status_mut() = StatusCode::NOT_FOUND;
                 Box::new(future::ok(response))
@@ -112,6 +153,7 @@ impl NewService for Proxy {
     type Future = Box<Future<Item = Self::Service, Error = Self::InitError> + Send>;
     type Service = ProxyService;
     fn new_service(&self) -> Self::Future {
+        trace!("new_service(&Proxy)");
         Box::new(future::ok(ProxyService {
             api_uri: self.api_uri.clone(),
         }))
@@ -134,6 +176,7 @@ impl Proxy {
         let addr = ([127, 0, 0, 1], 4000).into();
 
         let bound = Server::bind(&addr);
+        info!("Proxy listening on {}", &addr);
         let server = bound
             .serve(self)
             .map_err(|e| eprintln!("server error: {}", e));

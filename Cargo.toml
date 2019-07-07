@@ -5,8 +5,9 @@ authors = ["Alistair A. Israel <aisrael@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-log = "0.4"
-simplelog = "^0.6.0"
+futures = "0.1"
+graphql-parser = "0.2.3"
 http = "0.1"
 hyper = "0.12"
-futures = "0.1"
+log = "0.4"
+simplelog = "^0.6.0"
