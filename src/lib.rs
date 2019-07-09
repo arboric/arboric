@@ -1,12 +1,10 @@
-
+/// The arboric library
 use futures::future;
 use http::header::HeaderMap;
-/// The arboric library
-use log::{debug, info, trace, warn};
-use hyper::client::ResponseFuture;
 use hyper::rt::Future;
 use hyper::service::{NewService, Service};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
+use log::{debug, info, trace, warn};
 
 mod arboric;
 
@@ -25,15 +23,6 @@ pub struct ProxyService {
 }
 
 impl ProxyService {
-
-    fn forward_headers<T>(request: &Request<T>, header_map: &mut HeaderMap)
-    where
-        T: std::fmt::Debug,
-    {
-        trace!("forward_headers({:?}, {:?})", &request, &header_map);
-        Self::copy_headers(request.headers(), header_map);
-    }
-
     fn copy_headers(inbound_headers: &HeaderMap, header_map: &mut HeaderMap) {
         debug!("Got {} headers", header_map.iter().count());
         for (key, value) in inbound_headers.iter() {
@@ -45,7 +34,6 @@ impl ProxyService {
             }
         }
     }
-
 
     fn do_get(&self, req: Request<Body>) -> BoxFut {
         let req_uri = req.uri();
@@ -84,7 +72,10 @@ impl ProxyService {
             .unwrap()
     }
 
-    fn do_post(&self, inbound: Request<Body>) -> Box<impl Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+    fn do_post(
+        &self,
+        inbound: Request<Body>,
+    ) -> Box<impl Future<Item = Response<Body>, Error = hyper::Error> + Send> {
         trace!("do_post({:?}, {:?})", &self, &inbound);
         let req_uri = inbound.uri();
         debug!("req_uri => {}", req_uri);
@@ -94,27 +85,28 @@ impl ProxyService {
 
         let (parts, body) = inbound.into_parts();
 
-        trace!("log_post({:?})", &body);
+        trace!("do_post({:?})", &body);
 
         use futures::stream::Stream;
         let concat = body.concat2();
 
         trace!("concat => {:?}", concat);
-        let s = concat.map(move |chunk| {
-            trace!("chunk => {:?}", &chunk);
-            let v = chunk.to_vec();
-            let s = String::from_utf8_lossy(&v).to_string();
-            debug!("s => {:?}", &s);
-            arboric::log_post(&s);
-            s
-        }).into_stream();
+        let s = concat
+            .map(move |chunk| {
+                trace!("chunk => {:?}", &chunk);
+                let v = chunk.to_vec();
+                let s = String::from_utf8_lossy(&v).to_string();
+                debug!("s => {:?}", &s);
+                arboric::log_post(&s);
+                s
+            })
+            .into_stream();
         let mut r = Request::post(&uri).body(Body::wrap_stream(s)).unwrap();
         ProxyService::copy_headers(&parts.headers, r.headers_mut());
 
         let client = Client::new();
         Box::new(client.request(r))
     }
-
 }
 
 impl Service for ProxyService {
@@ -159,7 +151,6 @@ impl NewService for Proxy {
         }))
     }
 }
-
 
 impl Proxy {
     pub fn new<S>(api_uri: S) -> Proxy

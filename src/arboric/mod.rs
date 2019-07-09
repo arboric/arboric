@@ -1,6 +1,5 @@
 use graphql_parser::query::Definition::Operation;
 use graphql_parser::query::{parse_query, OperationDefinition};
-use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
 use log::{debug, info, trace, warn};
 
 pub fn log_post(body: &String) {
