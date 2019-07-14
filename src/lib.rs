@@ -90,6 +90,8 @@ impl ProxyService {
         use futures::stream::Stream;
         let concat = body.concat2();
 
+        let content_type = Self::get_content_type_as_mime_type(&parts.headers);
+        trace!("content_type => {:?}", &content_type);
         trace!("concat => {:?}", concat);
         let s = concat
             .map(move |chunk| {
@@ -97,15 +99,42 @@ impl ProxyService {
                 let v = chunk.to_vec();
                 let s = String::from_utf8_lossy(&v).to_string();
                 debug!("s => {:?}", &s);
-                arboric::log_post(&s);
+                arboric::log_post(content_type, &s);
                 s
             })
             .into_stream();
         let mut r = Request::post(&uri).body(Body::wrap_stream(s)).unwrap();
-        ProxyService::copy_headers(&parts.headers, r.headers_mut());
+        Self::copy_headers(&parts.headers, r.headers_mut());
 
         let client = Client::new();
         Box::new(client.request(r))
+    }
+
+    fn get_content_type_as_mime_type(headers: &HeaderMap) -> Option<mime::Mime> {
+        trace!("get_content_type_as_mime_type()");
+        match headers.get(http::header::CONTENT_TYPE) {
+            Some(header_value) => {
+                trace!("header_value => {:?}", header_value);
+                match header_value.to_str() {
+                    Ok(s) => {
+                        trace!("s => {}", s);
+                        match s.parse::<mime::Mime>() {
+                            Ok(mime) => Some(mime),
+                            Err(err) => {
+                                warn!("{}", err);
+                                None
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        warn!("{}", err);
+
+                        None
+                    }
+                }
+            }
+            _ => None,
+        }
     }
 }
 
