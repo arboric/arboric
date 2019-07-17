@@ -6,6 +6,9 @@ use serde_json::value::Value;
 use serde_json::Result;
 use std::collections::HashMap;
 
+pub mod proxy_service;
+pub use proxy_service::ProxyService;
+
 pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
     let application_graphql: mime::Mime = "application/graphql".parse().unwrap();
     trace!("log_post({:?}, {:?})", &content_type, &body);
