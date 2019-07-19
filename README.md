@@ -1,3 +1,12 @@
+Arboric GraphQL API Gateway
+====
+
+## Proof-of-Concept Roadmap
+
+* [x] JWT Authentication
+* [ ] Logging to InfluxDB
+* [ ] Role and Path-based Access Control Lists (black/white list)
+
 ## To test
 
 ### Without JWT authentication
