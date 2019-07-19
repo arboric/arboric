@@ -5,6 +5,7 @@ use hyper::rt::Future;
 use hyper::service::NewService;
 use hyper::{Body, Server};
 use log::{info, trace};
+use std::env;
 
 pub mod arboric;
 
@@ -12,6 +13,7 @@ pub mod arboric;
 #[derive(Debug)]
 pub struct Proxy {
     api_uri: String,
+    secret_key_bytes: Option<Vec<u8>>,
 }
 
 impl NewService for Proxy {
@@ -25,18 +27,36 @@ impl NewService for Proxy {
         trace!("new_service(&Proxy)");
         Box::new(future::ok(arboric::ProxyService {
             api_uri: self.api_uri.clone(),
+            secret_key_bytes: self.secret_key_bytes.clone(),
         }))
     }
 }
 
 impl Proxy {
+    /// Constructs a new Proxy with the given backend API URI
     pub fn new<S>(api_uri: S) -> Proxy
     where
         S: Into<String>,
     {
+        let secret_key_bytes = Self::get_secret_key_bytes();
         Proxy {
             api_uri: api_uri.into(),
+            secret_key_bytes: secret_key_bytes,
         }
+    }
+
+    fn get_secret_key_bytes() -> Option<Vec<u8>> {
+        if let Ok(vec) = Self::unsafe_get_secret_key_bytes() {
+            trace!("vec => {:?}", vec);
+            Some(vec)
+        } else {
+            None
+        }
+    }
+
+    fn unsafe_get_secret_key_bytes() -> Result<Vec<u8>, Box<std::error::Error>> {
+        let secret = env::var("SECRET_KEY_BASE")?;
+        Ok(hex::decode(&secret)?)
     }
 
     pub fn run(self) {

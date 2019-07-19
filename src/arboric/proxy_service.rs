@@ -5,14 +5,27 @@ use http::header::HeaderMap;
 use hyper::rt::Future;
 use hyper::service::Service;
 use hyper::{Body, Client, Method, Request, Response, StatusCode, Uri};
+use jsonwebtoken::{decode, TokenData, Validation};
 use log::{debug, trace, warn};
+use serde::{Deserialize, Serialize};
+use simple_error::bail;
+use std::error::Error;
 
 // Just a simple type alias
 type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    sub: String,
+    iss: String,
+    iat: Option<i64>,
+    exp: Option<i64>,
+}
+
 #[derive(Debug)]
 pub struct ProxyService {
     pub api_uri: String,
+    pub secret_key_bytes: Option<Vec<u8>>,
 }
 
 impl ProxyService {
@@ -129,6 +142,39 @@ impl ProxyService {
             _ => None,
         }
     }
+    fn halt(status_code: StatusCode) -> BoxFut {
+        let mut response = Response::new(Body::empty());
+        *response.status_mut() = status_code;
+        Box::new(future::ok(response))
+    }
+
+    fn get_authorization_token(
+        req: &Request<Body>,
+        secret_key_bytes: &Vec<u8>,
+    ) -> Result<TokenData<Claims>, Box<Error>> {
+        let validation = Validation {
+            validate_exp: false,
+            ..Default::default()
+        };
+
+        if let Some(authorization) = req.headers().get(http::header::AUTHORIZATION) {
+            trace!("{} => {:?}", http::header::AUTHORIZATION, &authorization);
+            let auth_str = &authorization.to_str()?;
+            if auth_str.starts_with("Bearer ") {
+                let ref token_str = auth_str[7..];
+                trace!("token => {}", &token_str);
+                Ok(decode::<Claims>(
+                    &token_str,
+                    &secret_key_bytes[..],
+                    &validation,
+                )?)
+            } else {
+                bail!("401 Unauthorized")
+            }
+        } else {
+            bail!("401 Unauthorized")
+        }
+    }
 }
 
 impl Service for ProxyService {
@@ -140,6 +186,13 @@ impl Service for ProxyService {
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
         trace!("call({:?}, {:?})", &self, &req);
         trace!("req.method() => {:?}", &req.method());
+        if let Some(ref secret_key_bytes) = &self.secret_key_bytes {
+            if let Ok(jwt) = Self::get_authorization_token(&req, secret_key_bytes) {
+                trace!("{:?}", jwt);
+            } else {
+                return Self::halt(StatusCode::UNAUTHORIZED);
+            }
+        }
         match req.method() {
             &Method::GET => {
                 trace!("about to call do_get()...");
@@ -151,9 +204,7 @@ impl Service for ProxyService {
             }
             _ => {
                 trace!("No match!");
-                let mut response = Response::new(Body::empty());
-                *response.status_mut() = StatusCode::NOT_FOUND;
-                Box::new(future::ok(response))
+                Self::halt(StatusCode::NOT_FOUND)
             }
         }
     }
