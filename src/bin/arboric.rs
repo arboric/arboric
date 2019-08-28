@@ -9,7 +9,7 @@ const API_URI: &str = "http://localhost:3000/graphql";
 
 const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Debug;
 
-fn main() -> Result<(), Box<Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     initialize_logging();
 
     let proxy = arboric::Proxy::new(API_URI);

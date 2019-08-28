@@ -50,6 +50,7 @@ fn count_json_query(body: &str) -> Result<usize> {
     Ok(count_top_level_fields(q.query.as_str()))
 }
 
+/// Counts the top level fields in the given GraphQL query string
 fn count_top_level_fields(query: &str) -> usize {
     trace!("count_top_level_fields({:?})", &query);
     let mut n: usize = 0;
@@ -73,4 +74,27 @@ fn count_top_level_fields(query: &str) -> usize {
         }
     };
     return n;
+}
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn test_count_top_level_fields() {
+        assert_eq!(count_top_level_fields("{}"), 0);
+        assert_eq!(count_top_level_fields("{foo{id}}"), 1);
+        let q = "
+        {
+            foo(id: 1) {
+                name
+            }
+            bar {
+                name
+            }
+        }
+        ";
+        assert_eq!(count_top_level_fields(&q), 2);
+    }
 }

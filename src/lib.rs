@@ -21,7 +21,7 @@ impl NewService for Proxy {
     type ResBody = Body;
     type Error = hyper::Error;
     type InitError = hyper::Error;
-    type Future = Box<Future<Item = Self::Service, Error = Self::InitError> + Send>;
+    type Future = Box<dyn Future<Item = Self::Service, Error = Self::InitError> + Send>;
     type Service = arboric::ProxyService;
     fn new_service(&self) -> Self::Future {
         trace!("new_service(&Proxy)");
@@ -54,7 +54,7 @@ impl Proxy {
         }
     }
 
-    fn unsafe_get_secret_key_bytes() -> Result<Vec<u8>, Box<std::error::Error>> {
+    fn unsafe_get_secret_key_bytes() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let secret = env::var("SECRET_KEY_BASE")?;
         Ok(hex::decode(&secret)?)
     }

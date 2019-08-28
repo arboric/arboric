@@ -151,7 +151,7 @@ impl ProxyService {
     fn get_authorization_token(
         req: &Request<Body>,
         secret_key_bytes: &Vec<u8>,
-    ) -> Result<TokenData<Claims>, Box<Error>> {
+    ) -> Result<TokenData<Claims>, Box<dyn Error>> {
         let validation = Validation {
             validate_exp: false,
             ..Default::default()
