@@ -1,3 +1,6 @@
+//! The arboric module. Functions and structs in this file are available
+//! in the `arboric::` namespace
+
 use crate::ArboricError;
 use graphql_parser::query::Definition::Operation;
 use graphql_parser::query::{parse_query, OperationDefinition, SelectionSet};
