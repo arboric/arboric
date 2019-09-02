@@ -1,7 +1,7 @@
 use crate::ArboricError;
 use graphql_parser::query::Definition::Operation;
 use graphql_parser::query::{parse_query, OperationDefinition, SelectionSet};
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use std::collections::HashMap;
@@ -88,20 +88,26 @@ fn count_json_query(body: &str) -> QueryCountsResult {
 fn count_top_level_fields(query: &str) -> QueryCountsResult {
     trace!("count_top_level_fields({:?})", &query);
     let mut results: HashMap<String, usize> = HashMap::new();
-    let document = parse_query(&query)?;
-    trace!("document => {:?}", &document);
-    for def in document.definitions.iter() {
-        match def {
-            Operation(OperationDefinition::Query(query)) => {
-                if let Some(query_name) = &query.name {
-                    debug!("query.name => {}", query_name);
+    match parse_query(&query) {
+        Ok(document) => {
+            trace!("document => {:?}", &document);
+            for def in document.definitions.iter() {
+                match def {
+                    Operation(OperationDefinition::Query(query)) => {
+                        if let Some(query_name) = &query.name {
+                            debug!("query.name => {}", query_name);
+                        }
+                        update_results(&mut results, &query.selection_set);
+                    }
+                    Operation(OperationDefinition::SelectionSet(selection_set)) => {
+                        update_results(&mut results, &selection_set);
+                    }
+                    _ => warn!("{:?}", def),
                 }
-                update_results(&mut results, &query.selection_set);
             }
-            Operation(OperationDefinition::SelectionSet(selection_set)) => {
-                update_results(&mut results, &selection_set);
-            }
-            _ => warn!("{:?}", def),
+        }
+        Err(e) => {
+            error!("graphql_parser::query::ParseError({})", e);
         }
     }
     return Ok(results);
@@ -124,11 +130,12 @@ fn update_results(results: &mut HashMap<String, usize>, selection_set: &Selectio
 
 #[cfg(test)]
 mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    // Import names from outer (for mod tests) scope.
     use super::*;
 
     #[test]
     fn test_count_top_level_fields() {
+        crate::initialize_logging();
         let mut expected: QueryCounts = HashMap::new();
         assert_eq!(count_top_level_fields("{}").unwrap(), expected);
         expected.insert("foo".into(), 1);
