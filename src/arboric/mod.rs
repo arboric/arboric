@@ -46,9 +46,9 @@ pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
 
     // if Precision is None, the default is second
     // Multiple write
-    // let _ = client
-    //     .write_points(points, Some(Precision::Milliseconds), None)
-    //     .unwrap();
+    let _ = client
+        .write_points(points, Some(Precision::Milliseconds), None)
+        .unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize)]
