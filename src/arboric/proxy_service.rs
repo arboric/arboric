@@ -6,7 +6,7 @@ use hyper::rt::Future;
 use hyper::service::Service;
 use hyper::{Body, Client, Method, Request, Response, StatusCode, Uri};
 use jsonwebtoken::{decode, TokenData, Validation};
-use log::{debug, trace, warn};
+use log::{debug, error, trace, warn};
 use serde::{Deserialize, Serialize};
 use simple_error::bail;
 use std::error::Error;
@@ -18,6 +18,7 @@ type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send
 struct Claims {
     sub: String,
     iss: String,
+    roles: Option<String>,
     iat: Option<i64>,
     exp: Option<i64>,
 }
@@ -141,7 +142,6 @@ impl ProxyService {
                     }
                     Err(err) => {
                         warn!("{}", err);
-
                         None
                     }
                 }
@@ -170,11 +170,13 @@ impl ProxyService {
             if auth_str.starts_with("Bearer ") {
                 let ref token_str = auth_str[7..];
                 trace!("token => {}", &token_str);
-                Ok(decode::<Claims>(
-                    &token_str,
-                    &secret_key_bytes[..],
-                    &validation,
-                )?)
+                match decode::<Claims>(&token_str, &secret_key_bytes[..], &validation) {
+                    Ok(claims) => Ok(claims),
+                    Err(e) => {
+                        error!("{}", e);
+                        bail!("401 Unauthorized")
+                    }
+                }
             } else {
                 bail!("401 Unauthorized")
             }
