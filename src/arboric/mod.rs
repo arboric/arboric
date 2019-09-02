@@ -35,13 +35,18 @@ pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
         }
     };
     if let Ok(map) = results {
-        info!("Found {} fields/queries", map.keys().count());
+        let total: usize = map.values().sum();
+        info!(
+            "Found {} ({} unique) fields/queries",
+            total,
+            map.keys().count()
+        );
 
         let client = Client::new("http://localhost:8086", "arboric");
 
         let mut points: Vec<Point> = Vec::new();
         for (field, n) in map {
-            trace!("field => {}, n => {}", &field, &n);
+            debug!("{}: {}", &field, &n);
             let point = Point::new("queries")
                 .add_tag("field", Value::String(field))
                 .add_field("n", Value::Integer(n as i64))
