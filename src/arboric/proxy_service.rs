@@ -9,6 +9,7 @@ use jsonwebtoken::{decode, TokenData, Validation};
 use log::{debug, error, trace, warn};
 use serde::{Deserialize, Serialize};
 use simple_error::bail;
+use std::collections::HashMap;
 use std::error::Error;
 
 // Just a simple type alias
@@ -27,6 +28,15 @@ struct Claims {
 pub struct ProxyService {
     pub api_uri: String,
     pub secret_key_bytes: Option<Vec<u8>>,
+}
+
+fn protected_queries_map() -> HashMap<String, Vec<String>> {
+    let mut m = HashMap::new();
+    m.insert(
+        "admin".to_string(),
+        vec!["__schema".to_string(), "__type".to_string()],
+    );
+    m
 }
 
 impl ProxyService {
@@ -49,7 +59,7 @@ impl ProxyService {
         }
     }
 
-    fn do_get(&self, req: Request<Body>) -> BoxFut {
+    fn do_get(&self, _claims: Option<Claims>, req: Request<Body>) -> BoxFut {
         let req_uri = req.uri();
         debug!("req_uri => {}", req_uri);
 
@@ -88,6 +98,7 @@ impl ProxyService {
 
     fn do_post(
         &self,
+        claims: Option<Claims>,
         inbound: Request<Body>,
     ) -> Box<impl Future<Item = Response<Body>, Error = hyper::Error> + Send> {
         trace!("do_post({:?}, {:?})", &self, &inbound);
@@ -171,7 +182,7 @@ impl ProxyService {
                 let ref token_str = auth_str[7..];
                 trace!("token => {}", &token_str);
                 match decode::<Claims>(&token_str, &secret_key_bytes[..], &validation) {
-                    Ok(claims) => Ok(claims),
+                    Ok(token_data) => Ok(token_data),
                     Err(e) => {
                         error!("{}", e);
                         bail!("401 Unauthorized")
@@ -195,21 +206,26 @@ impl Service for ProxyService {
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
         trace!("call({:?}, {:?})", &self, &req);
         trace!("req.method() => {:?}", &req.method());
+        let claims: Option<Claims>;
         if let Some(ref secret_key_bytes) = &self.secret_key_bytes {
             if let Ok(jwt) = Self::get_authorization_token(&req, secret_key_bytes) {
                 trace!("{:?}", jwt);
+                claims = Some(jwt.claims);
+                trace!("{:?}", claims);
             } else {
                 return Self::halt(StatusCode::UNAUTHORIZED);
             }
+        } else {
+            claims = None;
         }
         match req.method() {
             &Method::GET => {
                 trace!("about to call do_get()...");
-                self.do_get(req)
+                self.do_get(claims, req)
             }
             &Method::POST => {
                 trace!("about to call do_post()...");
-                self.do_post(req)
+                self.do_post(claims, req)
             }
             _ => {
                 trace!("No match!");
