@@ -10,6 +10,8 @@ pub mod proxy_service;
 pub use proxy_service::ProxyService;
 
 pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
+    use influx_db_client::{Client, Point, Points, Precision, Value};
+
     let application_graphql: mime::Mime = "application/graphql".parse().unwrap();
     trace!("log_post({:?}, {:?})", &content_type, &body);
     let n = match content_type {
@@ -33,6 +35,20 @@ pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
         }
     };
     info!("Found {} fields/queries", n);
+
+    let client = Client::new("http://localhost:8086", "arboric");
+
+    let point = Point::new("queries")
+        .add_field("n", Value::Integer(n as i64))
+        .to_owned();
+
+    let points = points!(point);
+
+    // if Precision is None, the default is second
+    // Multiple write
+    // let _ = client
+    //     .write_points(points, Some(Precision::Milliseconds), None)
+    //     .unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -80,7 +96,8 @@ fn count_top_level_fields(query: &str) -> usize {
 mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
-    use influx_db_client::{Client, Point, Points, Precision, Value};
+    use influxdb::client::InfluxDbClient;
+    use influxdb::query::{InfluxDbQuery, Timestamp};
 
     #[test]
     fn test_count_top_level_fields() {
@@ -97,39 +114,5 @@ mod tests {
         }
         ";
         assert_eq!(count_top_level_fields(&q), 2);
-    }
-
-    #[test]
-    fn test_influxdb() {
-        // default with "http://127.0.0.1:8086", db with "test"
-        let client = Client::default().set_authentication("root", "root");
-
-        let mut point = point!("test1");
-        point
-            .add_field("foo", Value::String("bar".to_string()))
-            .add_field("integer", Value::Integer(11))
-            .add_field("float", Value::Float(22.3))
-            .add_field("'boolean'", Value::Boolean(false));
-
-        let point1 = Point::new("test1")
-            .add_tag("tags", Value::String(String::from("\\\"fda")))
-            .add_tag("number", Value::Integer(12))
-            .add_tag("float", Value::Float(12.6))
-            .add_field("fd", Value::String("'3'".to_string()))
-            .add_field("quto", Value::String("\\\"fda".to_string()))
-            .add_field("quto1", Value::String("\"fda".to_string()))
-            .to_owned();
-
-        let points = points!(point1, point);
-
-        // if Precision is None, the default is second
-        // Multiple write
-        let _ = client
-            .write_points(points, Some(Precision::Seconds), None)
-            .unwrap();
-
-        // query, it's type is Option<Vec<Node>>
-        let res = client.query("select * from test1", None).unwrap();
-        println!("{:?}", res.unwrap()[0].series)
     }
 }

@@ -9,7 +9,6 @@ use std::env;
 
 pub mod arboric;
 
-#[cfg(test)]
 #[macro_use]
 extern crate influx_db_client;
 
@@ -29,10 +28,10 @@ impl NewService for Proxy {
     type Service = arboric::ProxyService;
     fn new_service(&self) -> Self::Future {
         trace!("new_service(&Proxy)");
-        Box::new(future::ok(arboric::ProxyService {
-            api_uri: self.api_uri.clone(),
-            secret_key_bytes: self.secret_key_bytes.clone(),
-        }))
+        Box::new(future::ok(arboric::ProxyService::new(
+            &self.api_uri,
+            &self.secret_key_bytes,
+        )))
     }
 }
 

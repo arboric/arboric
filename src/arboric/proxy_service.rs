@@ -29,6 +29,13 @@ pub struct ProxyService {
 }
 
 impl ProxyService {
+    pub fn new(api_uri: &String, secret_key_bytes: &Option<Vec<u8>>) -> ProxyService {
+        ProxyService {
+            api_uri: api_uri.clone(),
+            secret_key_bytes: secret_key_bytes.clone()
+        }
+    }
+
     fn copy_headers(inbound_headers: &HeaderMap, header_map: &mut HeaderMap) {
         debug!("Got {} headers", inbound_headers.iter().count());
         for (key, value) in inbound_headers.iter() {
@@ -105,7 +112,7 @@ impl ProxyService {
                 let v = chunk.to_vec();
                 let body = String::from_utf8_lossy(&v).to_string();
                 debug!("body => {:?}", &body);
-                super::log_post(content_type, &body);
+                super::log_post(content_type, &body); // arboric::log_post()
                 body
             })
             .into_stream();

@@ -6,7 +6,7 @@ use simplelog::{LevelFilter, SimpleLogger};
 use std::env;
 use std::error::Error;
 
-const API_URI: &str = "http://localhost:3000/graphql";
+const API_URI: &str = "http://localhost:3001/graphql";
 
 const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Debug;
 

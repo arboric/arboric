@@ -1,6 +1,34 @@
 version: "3"
+volumes:
+  influxdb-data:
+  grafana-data:
 services:
+  test_api:
+    image: aisrael/graphql-dotnet-examples
+    ports:
+      - 3001:80
   influxdb:
     image: influxdb:1.5.4
     ports:
       - 8086:8086
+    environment:
+      INFLUXDB_DB: arboric
+    volumes:
+      - influxdb-data:/var/lib/influxdb
+    container_name: influxdb
+  grafana:
+    image: grafana/grafana
+    user: "104"
+    links:
+      - influxdb:influxdb
+    depends_on:
+      - influxdb
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./etc/grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./etc/grafana/config.monitoring
+    container_name: grafana
+    restart: always
