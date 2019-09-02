@@ -1,1 +1,4 @@
-{hero{id name friends{id name}}}
+{
+    hero{id name friends{id name}}
+    hero{id name friends{id name}}
+}

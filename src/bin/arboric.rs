@@ -8,7 +8,7 @@ use std::error::Error;
 
 const API_URI: &str = "http://localhost:3001/graphql";
 
-const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Debug;
+const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Trace;
 
 fn main() -> Result<(), Box<dyn Error>> {
     initialize_logging();

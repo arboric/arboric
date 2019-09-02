@@ -1,5 +1,6 @@
 //! The arboric library
-
+//!
+use failure::Fail;
 use futures::future;
 use hyper::rt::Future;
 use hyper::service::NewService;
@@ -17,6 +18,45 @@ extern crate influx_db_client;
 pub struct Proxy {
     api_uri: String,
     secret_key_bytes: Option<Vec<u8>>,
+}
+
+/// Arboric error type to 'wrap' other, underlying error causes
+#[derive(Debug, Fail)]
+pub enum ArboricError {
+    #[fail(display = "{}", message)]
+    GeneralError { message: String },
+
+    #[fail(display = "{}", message)]
+    JsonError {
+        message: String,
+        #[cause]
+        cause: serde_json::Error,
+    },
+
+    #[fail(display = "{}", message)]
+    GraphqlParserError {
+        message: String,
+        #[cause]
+        cause: graphql_parser::query::ParseError,
+    },
+}
+
+impl From<serde_json::Error> for ArboricError {
+    fn from(json_error: serde_json::Error) -> Self {
+        ArboricError::JsonError {
+            message: format!("{:?}", json_error),
+            cause: json_error,
+        }
+    }
+}
+
+impl From<graphql_parser::query::ParseError> for ArboricError {
+    fn from(parser_error: graphql_parser::query::ParseError) -> Self {
+        ArboricError::GraphqlParserError {
+            message: format!("{:?}", parser_error),
+            cause: parser_error,
+        }
+    }
 }
 
 impl NewService for Proxy {
@@ -74,13 +114,5 @@ impl Proxy {
 
         // Run this server for... forever!
         hyper::rt::run(server);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }

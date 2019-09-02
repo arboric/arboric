@@ -5,6 +5,7 @@ authors = ["Alistair A. Israel <aisrael@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+failure = "0.1"
 futures = "0.1"
 graphql-parser = "0.2.3"
 hex = "0.3.2"

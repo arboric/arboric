@@ -32,7 +32,7 @@ impl ProxyService {
     pub fn new(api_uri: &String, secret_key_bytes: &Option<Vec<u8>>) -> ProxyService {
         ProxyService {
             api_uri: api_uri.clone(),
-            secret_key_bytes: secret_key_bytes.clone()
+            secret_key_bytes: secret_key_bytes.clone(),
         }
     }
 
