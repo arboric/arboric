@@ -10,9 +10,6 @@ use std::env;
 
 pub mod arboric;
 
-#[macro_use]
-extern crate influx_db_client;
-
 /// The main Proxy
 #[derive(Debug)]
 pub struct Proxy {
