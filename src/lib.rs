@@ -1,5 +1,6 @@
 //! The arboric library
-
+//!
+use failure::Fail;
 use futures::future;
 use hyper::rt::Future;
 use hyper::service::NewService;
@@ -16,19 +17,58 @@ pub struct Proxy {
     secret_key_bytes: Option<Vec<u8>>,
 }
 
+/// Arboric error type to 'wrap' other, underlying error causes
+#[derive(Debug, Fail)]
+pub enum ArboricError {
+    #[fail(display = "{}", message)]
+    GeneralError { message: String },
+
+    #[fail(display = "{}", message)]
+    JsonError {
+        message: String,
+        #[cause]
+        cause: serde_json::Error,
+    },
+
+    #[fail(display = "{}", message)]
+    GraphqlParserError {
+        message: String,
+        #[cause]
+        cause: graphql_parser::query::ParseError,
+    },
+}
+
+impl From<serde_json::Error> for ArboricError {
+    fn from(json_error: serde_json::Error) -> Self {
+        ArboricError::JsonError {
+            message: format!("{:?}", json_error),
+            cause: json_error,
+        }
+    }
+}
+
+impl From<graphql_parser::query::ParseError> for ArboricError {
+    fn from(parser_error: graphql_parser::query::ParseError) -> Self {
+        ArboricError::GraphqlParserError {
+            message: format!("{:?}", parser_error),
+            cause: parser_error,
+        }
+    }
+}
+
 impl NewService for Proxy {
     type ReqBody = Body;
     type ResBody = Body;
     type Error = hyper::Error;
     type InitError = hyper::Error;
-    type Future = Box<Future<Item = Self::Service, Error = Self::InitError> + Send>;
+    type Future = Box<dyn Future<Item = Self::Service, Error = Self::InitError> + Send>;
     type Service = arboric::ProxyService;
     fn new_service(&self) -> Self::Future {
         trace!("new_service(&Proxy)");
-        Box::new(future::ok(arboric::ProxyService {
-            api_uri: self.api_uri.clone(),
-            secret_key_bytes: self.secret_key_bytes.clone(),
-        }))
+        Box::new(future::ok(arboric::ProxyService::new(
+            &self.api_uri,
+            &self.secret_key_bytes,
+        )))
     }
 }
 
@@ -54,7 +94,7 @@ impl Proxy {
         }
     }
 
-    fn unsafe_get_secret_key_bytes() -> Result<Vec<u8>, Box<std::error::Error>> {
+    fn unsafe_get_secret_key_bytes() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let secret = env::var("SECRET_KEY_BASE")?;
         Ok(hex::decode(&secret)?)
     }
@@ -71,13 +111,5 @@ impl Proxy {
 
         // Run this server for... forever!
         hyper::rt::run(server);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }

@@ -5,11 +5,12 @@ use simplelog::{LevelFilter, SimpleLogger};
 
 use std::env;
 use std::error::Error;
-const API_URI: &str = "http://localhost:3000/graphql";
 
-const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Debug;
+const API_URI: &str = "http://localhost:3001/graphql";
 
-fn main() -> Result<(), Box<Error>> {
+const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Trace;
+
+fn main() -> Result<(), Box<dyn Error>> {
     initialize_logging();
 
     let proxy = arboric::Proxy::new(API_URI);

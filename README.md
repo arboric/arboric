@@ -12,7 +12,7 @@ Arboric GraphQL API Gateway
 ### Without JWT authentication
 
 ```
-docker run --rm -p 3000:80 aisrael/graphql-dotnet-examples
+docker-compose up
 ```
 
 ```
@@ -51,4 +51,18 @@ curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bear
 
 ```
 curl -w "\n" -x localhost:4000 -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo"  --data "@test/heroes.json" http://localhost:3000/graphql
+```
+
+## InfluxDB and Grafana
+
+```
+docker exec -it influxdb influx -execute 'create database glances'
+```
+
+```
+glances --export influxdb
+```
+
+```
+curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "db=glances" --data-urlencode "q=SELECT * from \"localhost.cpu\" limit 1"
 ```
