@@ -1,0 +1,8 @@
+stages:
+  - test
+
+cargo_test:
+  stage: test
+  image: rust:1.37.0-stretch
+  script:
+    - cargo test
