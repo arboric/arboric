@@ -12,7 +12,6 @@ use std::collections::HashMap;
 pub mod proxy_service;
 pub use proxy_service::ProxyService;
 
-
 type QueryCounts = HashMap<String, usize>;
 type QueryCountsResult = Result<QueryCounts, ArboricError>;
 
@@ -49,34 +48,34 @@ pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> QueryCount
 
 pub fn log_counts(map: QueryCounts) {
     use influx_db_client::{Client, Point, Points, Precision, Value};
-        let total: usize = map.values().sum();
-        info!(
-            "Found {} ({} unique) fields/queries",
-            total,
-            map.keys().count()
-        );
+    let total: usize = map.values().sum();
+    info!(
+        "Found {} ({} unique) fields/queries",
+        total,
+        map.keys().count()
+    );
 
-        let client = Client::new("http://localhost:8086", "arboric");
+    let client = Client::new("http://localhost:8086", "arboric");
 
-        let mut points: Vec<Point> = Vec::new();
-        for (field, n) in map {
-            debug!("{}: {}", &field, &n);
-            let point = Point::new("queries")
-                .add_tag("field", Value::String(field))
-                .add_field("n", Value::Integer(n as i64))
-                .to_owned();
-            points.push(point);
-        }
+    let mut points: Vec<Point> = Vec::new();
+    for (field, n) in map {
+        debug!("{}: {}", &field, &n);
+        let point = Point::new("queries")
+            .add_tag("field", Value::String(field))
+            .add_field("n", Value::Integer(n as i64))
+            .to_owned();
+        points.push(point);
+    }
 
-        // if Precision is None, the default is second
-        // Multiple write
-        let _ = client
-            .write_points(
-                Points::create_new(points),
-                Some(Precision::Milliseconds),
-                None,
-            )
-            .unwrap();
+    // if Precision is None, the default is second
+    // Multiple write
+    let _ = client
+        .write_points(
+            Points::create_new(points),
+            Some(Precision::Milliseconds),
+            None,
+        )
+        .unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize)]

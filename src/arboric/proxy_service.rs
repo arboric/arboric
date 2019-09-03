@@ -100,7 +100,9 @@ impl ProxyService {
         &self,
         claims: Option<Claims>,
         inbound: Request<Body>,
-    ) -> Box<impl Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+    ) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+        use futures::stream::Stream;
+
         trace!("do_post({:?}, {:?})", &self, &inbound);
         let req_uri = inbound.uri();
         debug!("req_uri => {}", req_uri);
@@ -108,11 +110,20 @@ impl ProxyService {
         let uri: hyper::Uri = self.api_uri.parse().unwrap();
         debug!("uri => {}", uri);
 
+        if let Some(_) = &self.secret_key_bytes {
+            match claims {
+                Some(c) => match c.roles {
+                    Some(s) => trace!("{:?}", s.split(",")),
+                    None => return halt(StatusCode::UNAUTHORIZED),
+                },
+                None => return halt(StatusCode::UNAUTHORIZED),
+            }
+        }
+
         let (parts, body) = inbound.into_parts();
 
         trace!("do_post({:?})", &body);
 
-        use futures::stream::Stream;
         let concat = body.concat2();
 
         let content_type = Self::get_content_type_as_mime_type(&parts.headers);
@@ -160,11 +171,6 @@ impl ProxyService {
             }
             _ => None,
         }
-    }
-    fn halt(status_code: StatusCode) -> BoxFut {
-        let mut response = Response::new(Body::empty());
-        *response.status_mut() = status_code;
-        Box::new(future::ok(response))
     }
 
     fn get_authorization_token(
@@ -214,7 +220,7 @@ impl Service for ProxyService {
                 claims = Some(jwt.claims);
                 trace!("{:?}", claims);
             } else {
-                return Self::halt(StatusCode::UNAUTHORIZED);
+                return halt(StatusCode::UNAUTHORIZED);
             }
         } else {
             claims = None;
@@ -230,8 +236,14 @@ impl Service for ProxyService {
             }
             _ => {
                 trace!("No match!");
-                Self::halt(StatusCode::NOT_FOUND)
+                halt(StatusCode::NOT_FOUND)
             }
         }
     }
+}
+
+fn halt(status_code: StatusCode) -> BoxFut {
+    let mut response = Response::new(Body::empty());
+    *response.status_mut() = status_code;
+    Box::new(future::ok(response))
 }
