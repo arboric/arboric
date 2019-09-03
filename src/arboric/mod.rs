@@ -12,12 +12,20 @@ use std::collections::HashMap;
 pub mod proxy_service;
 pub use proxy_service::ProxyService;
 
-pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
-    use influx_db_client::{Client, Point, Points, Precision, Value};
 
+type QueryCounts = HashMap<String, usize>;
+type QueryCountsResult = Result<QueryCounts, ArboricError>;
+
+pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
+    if let Ok(counts) = parse_post(content_type, &body) {
+        log_counts(counts);
+    }
+}
+
+pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> QueryCountsResult {
     let application_graphql: mime::Mime = "application/graphql".parse().unwrap();
     trace!("log_post({:?}, {:?})", &content_type, &body);
-    let results = match content_type {
+    match content_type {
         Some(ref mime_type) if &application_graphql == mime_type => count_top_level_fields(body),
         Some(ref mime_type) if mime_type == &mime::APPLICATION_JSON => {
             match count_json_query(body) {
@@ -36,8 +44,11 @@ pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
             warn!("No content-type specified, will try to parse as application/graphql");
             count_top_level_fields(body)
         }
-    };
-    if let Ok(map) = results {
+    }
+}
+
+pub fn log_counts(map: QueryCounts) {
+    use influx_db_client::{Client, Point, Points, Precision, Value};
         let total: usize = map.values().sum();
         info!(
             "Found {} ({} unique) fields/queries",
@@ -66,7 +77,6 @@ pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
                 None,
             )
             .unwrap();
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -75,9 +85,6 @@ struct GraphQLJSONQuery {
     operation_name: Option<String>,
     variables: Option<HashMap<String, Value>>,
 }
-
-type QueryCounts = HashMap<String, usize>;
-type QueryCountsResult = Result<QueryCounts, ArboricError>;
 
 fn count_json_query(body: &str) -> QueryCountsResult {
     trace!("count_json_query({})", &body);

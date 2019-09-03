@@ -124,7 +124,8 @@ impl ProxyService {
                 let v = chunk.to_vec();
                 let body = String::from_utf8_lossy(&v).to_string();
                 debug!("body => {:?}", &body);
-                super::log_post(content_type, &body); // arboric::log_post()
+                // TODO: arboric::count_post() then arboric::log_counts()
+                super::log_post(content_type, &body);
                 body
             })
             .into_stream();
