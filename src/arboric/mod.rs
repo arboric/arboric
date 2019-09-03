@@ -12,14 +12,21 @@ use std::collections::HashMap;
 pub mod proxy_service;
 pub use proxy_service::ProxyService;
 
-pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
-    use influx_db_client::{Client, Point, Points, Precision, Value};
+type QueryCounts = HashMap<String, usize>;
+type QueryCountsResult = Result<QueryCounts, ArboricError>;
 
+pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
+    if let Ok(counts) = parse_post(content_type, &body) {
+        log_counts(&counts);
+    }
+}
+
+pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> QueryCountsResult {
+    trace!("parse_post({:?}, {:?})", &content_type, &body);
     let application_graphql: mime::Mime = "application/graphql".parse().unwrap();
-    trace!("log_post({:?}, {:?})", &content_type, &body);
-    let results = match content_type {
+    match content_type {
         Some(ref mime_type) if &application_graphql == mime_type => count_top_level_fields(body),
-        Some(ref mime_type) if mime_type == &mime::APPLICATION_JSON => {
+        Some(ref mime_type) if &mime::APPLICATION_JSON == mime_type => {
             match count_json_query(body) {
                 Ok(results) => Ok(results),
                 Err(err) => {
@@ -36,37 +43,39 @@ pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
             warn!("No content-type specified, will try to parse as application/graphql");
             count_top_level_fields(body)
         }
-    };
-    if let Ok(map) = results {
-        let total: usize = map.values().sum();
-        info!(
-            "Found {} ({} unique) fields/queries",
-            total,
-            map.keys().count()
-        );
-
-        let client = Client::new("http://localhost:8086", "arboric");
-
-        let mut points: Vec<Point> = Vec::new();
-        for (field, n) in map {
-            debug!("{}: {}", &field, &n);
-            let point = Point::new("queries")
-                .add_tag("field", Value::String(field))
-                .add_field("n", Value::Integer(n as i64))
-                .to_owned();
-            points.push(point);
-        }
-
-        // if Precision is None, the default is second
-        // Multiple write
-        let _ = client
-            .write_points(
-                Points::create_new(points),
-                Some(Precision::Milliseconds),
-                None,
-            )
-            .unwrap();
     }
+}
+
+pub fn log_counts(map: &QueryCounts) {
+    use influx_db_client::{Client, Point, Points, Precision, Value};
+    let total: usize = map.values().sum();
+    info!(
+        "Found {} ({} unique) fields/queries",
+        total,
+        map.keys().count()
+    );
+
+    let client = Client::new("http://localhost:8086", "arboric");
+
+    let mut points: Vec<Point> = Vec::new();
+    for (field, n) in map {
+        debug!("{}: {}", &field, &n);
+        let point = Point::new("queries")
+            .add_tag("field", Value::String(field.clone()))
+            .add_field("n", Value::Integer(*n as i64))
+            .to_owned();
+        points.push(point);
+    }
+
+    // if Precision is None, the default is second
+    // Multiple write
+    let _ = client
+        .write_points(
+            Points::create_new(points),
+            Some(Precision::Milliseconds),
+            None,
+        )
+        .unwrap();
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -75,9 +84,6 @@ struct GraphQLJSONQuery {
     operation_name: Option<String>,
     variables: Option<HashMap<String, Value>>,
 }
-
-type QueryCounts = HashMap<String, usize>;
-type QueryCountsResult = Result<QueryCounts, ArboricError>;
 
 fn count_json_query(body: &str) -> QueryCountsResult {
     trace!("count_json_query({})", &body);

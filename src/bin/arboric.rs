@@ -1,9 +1,6 @@
 extern crate hyper;
 
-use log::debug;
-use simplelog::{LevelFilter, SimpleLogger};
-
-use std::env;
+use log::trace;
 use std::error::Error;
 
 const API_URI: &str = "http://localhost:3001/graphql";
@@ -13,7 +10,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     arboric::initialize_logging();
 
     let proxy = arboric::Proxy::new(API_URI);
-    debug!("{:?}", proxy);
+    trace!("{:?}", proxy);
 
     proxy.run();
 

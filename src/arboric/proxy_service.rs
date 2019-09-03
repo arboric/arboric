@@ -6,9 +6,10 @@ use hyper::rt::Future;
 use hyper::service::Service;
 use hyper::{Body, Client, Method, Request, Response, StatusCode, Uri};
 use jsonwebtoken::{decode, TokenData, Validation};
-use log::{debug, trace, warn};
+use log::{debug, error, trace, warn};
 use serde::{Deserialize, Serialize};
 use simple_error::bail;
+use std::collections::HashMap;
 use std::error::Error;
 
 // Just a simple type alias
@@ -18,6 +19,7 @@ type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send
 struct Claims {
     sub: String,
     iss: String,
+    roles: Option<String>,
     iat: Option<i64>,
     exp: Option<i64>,
 }
@@ -26,6 +28,15 @@ struct Claims {
 pub struct ProxyService {
     pub api_uri: String,
     pub secret_key_bytes: Option<Vec<u8>>,
+}
+
+fn protected_queries_map() -> HashMap<String, Vec<String>> {
+    let mut m = HashMap::new();
+    m.insert(
+        "admin".to_string(),
+        vec!["__schema".to_string(), "__type".to_string()],
+    );
+    m
 }
 
 impl ProxyService {
@@ -48,7 +59,7 @@ impl ProxyService {
         }
     }
 
-    fn do_get(&self, req: Request<Body>) -> BoxFut {
+    fn do_get(&self, _claims: Option<Claims>, req: Request<Body>) -> BoxFut {
         let req_uri = req.uri();
         debug!("req_uri => {}", req_uri);
 
@@ -87,8 +98,11 @@ impl ProxyService {
 
     fn do_post(
         &self,
+        claims: Option<Claims>,
         inbound: Request<Body>,
-    ) -> Box<impl Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+    ) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+        use futures::stream::Stream;
+
         trace!("do_post({:?}, {:?})", &self, &inbound);
         let req_uri = inbound.uri();
         debug!("req_uri => {}", req_uri);
@@ -96,31 +110,70 @@ impl ProxyService {
         let uri: hyper::Uri = self.api_uri.parse().unwrap();
         debug!("uri => {}", uri);
 
+        let auth: bool = if let Some(_) = &self.secret_key_bytes {
+            true
+        } else {
+            false
+        };
+        let roles: Vec<String>;
+        if auth {
+            match claims {
+                Some(c) => match c.roles {
+                    Some(s) => {
+                        roles = s.split(",").map(|t| t.to_owned()).collect();
+                        trace!("{:?}", roles);
+                    }
+                    None => return halt(StatusCode::UNAUTHORIZED),
+                },
+                None => return halt(StatusCode::UNAUTHORIZED),
+            }
+        } else {
+            roles = Vec::new();
+        };
+
         let (parts, body) = inbound.into_parts();
 
         trace!("do_post({:?})", &body);
 
-        use futures::stream::Stream;
-        let concat = body.concat2();
-
         let content_type = Self::get_content_type_as_mime_type(&parts.headers);
         trace!("content_type => {:?}", &content_type);
-        trace!("concat => {:?}", concat);
-        let s = concat
-            .map(move |chunk| {
-                trace!("chunk => {:?}", &chunk);
-                let v = chunk.to_vec();
-                let body = String::from_utf8_lossy(&v).to_string();
-                debug!("body => {:?}", &body);
-                super::log_post(content_type, &body); // arboric::log_post()
-                body
-            })
-            .into_stream();
-        let mut r = Request::post(&uri).body(Body::wrap_stream(s)).unwrap();
-        Self::copy_headers(&parts.headers, r.headers_mut());
 
-        let client = Client::new();
-        Box::new(client.request(r))
+        Box::new(body.concat2().from_err().and_then(move |chunk| {
+            trace!("chunk => {:?}", &chunk);
+            let v = chunk.to_vec();
+            let body = String::from_utf8_lossy(&v).to_string();
+            debug!("body => {:?}", &body);
+            if let Ok(counts) = super::parse_post(content_type, &body) {
+                super::log_counts(&counts);
+
+                if auth {
+                    let qmap = protected_queries_map();
+                    if let Some(r) = roles.iter().find(|&role| {
+                        if let Some(vec) = qmap.get(&role.to_string()) {
+                            let all = counts.keys().all(|field| {
+                                trace!("field => {}", &field);
+                                vec.contains(&field)
+                            });
+                            trace!("all => {}", &all);
+                            all
+                        } else {
+                            false
+                        }
+                    }) {
+                        trace!("Found {}", &r);
+                    } else {
+                        return halt(StatusCode::UNAUTHORIZED);
+                    }
+                }
+                let mut r = Request::post(&uri).body(Body::from(body)).unwrap();
+                Self::copy_headers(&parts.headers, r.headers_mut());
+
+                let client = Client::new();
+                Box::new(client.request(r))
+            } else {
+                halt(StatusCode::BAD_REQUEST)
+            }
+        }))
     }
 
     fn get_content_type_as_mime_type(headers: &HeaderMap) -> Option<mime::Mime> {
@@ -141,18 +194,12 @@ impl ProxyService {
                     }
                     Err(err) => {
                         warn!("{}", err);
-
                         None
                     }
                 }
             }
             _ => None,
         }
-    }
-    fn halt(status_code: StatusCode) -> BoxFut {
-        let mut response = Response::new(Body::empty());
-        *response.status_mut() = status_code;
-        Box::new(future::ok(response))
     }
 
     fn get_authorization_token(
@@ -170,11 +217,13 @@ impl ProxyService {
             if auth_str.starts_with("Bearer ") {
                 let ref token_str = auth_str[7..];
                 trace!("token => {}", &token_str);
-                Ok(decode::<Claims>(
-                    &token_str,
-                    &secret_key_bytes[..],
-                    &validation,
-                )?)
+                match decode::<Claims>(&token_str, &secret_key_bytes[..], &validation) {
+                    Ok(token_data) => Ok(token_data),
+                    Err(e) => {
+                        error!("{}", e);
+                        bail!("401 Unauthorized")
+                    }
+                }
             } else {
                 bail!("401 Unauthorized")
             }
@@ -193,26 +242,41 @@ impl Service for ProxyService {
     fn call(&mut self, req: Request<Self::ReqBody>) -> Self::Future {
         trace!("call({:?}, {:?})", &self, &req);
         trace!("req.method() => {:?}", &req.method());
+        let claims: Option<Claims>;
         if let Some(ref secret_key_bytes) = &self.secret_key_bytes {
             if let Ok(jwt) = Self::get_authorization_token(&req, secret_key_bytes) {
                 trace!("{:?}", jwt);
+                claims = Some(jwt.claims);
+                trace!("{:?}", claims);
             } else {
-                return Self::halt(StatusCode::UNAUTHORIZED);
+                return halt(StatusCode::UNAUTHORIZED);
             }
+        } else {
+            claims = None;
         }
         match req.method() {
             &Method::GET => {
                 trace!("about to call do_get()...");
-                self.do_get(req)
+                self.do_get(claims, req)
             }
             &Method::POST => {
                 trace!("about to call do_post()...");
-                self.do_post(req)
+                self.do_post(claims, req)
             }
             _ => {
                 trace!("No match!");
-                Self::halt(StatusCode::NOT_FOUND)
+                halt(StatusCode::NOT_FOUND)
             }
         }
     }
+}
+
+fn respond(status_code: StatusCode) -> Response<Body> {
+    let mut response = Response::new(Body::empty());
+    *response.status_mut() = status_code;
+    response
+}
+
+fn halt(status_code: StatusCode) -> BoxFut {
+    Box::new(future::ok(respond(status_code)))
 }
