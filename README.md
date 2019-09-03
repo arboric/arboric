@@ -53,6 +53,14 @@ Using a JWT with `"admin"` role:
 curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE" --data "@test/admin_only.json" http://localhost:4000
 ```
 
+## Benchmarking (using `ab`)
+
+With JWT and `"admin"` role:
+
+```
+ab -p test/admin_only.json -T "application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE" -n 1000 -c 10 --data http://127.0.0.1:4000/
+```
+
 ### As a Proxy (with Authentication)
 
 ```

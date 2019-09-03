@@ -1,0 +1,3 @@
+{
+    "query": "{hero{id name friends{id name}} droid(id:\"3\"){name friends{name}}}"
+}
