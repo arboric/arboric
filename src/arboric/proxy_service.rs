@@ -110,41 +110,70 @@ impl ProxyService {
         let uri: hyper::Uri = self.api_uri.parse().unwrap();
         debug!("uri => {}", uri);
 
-        if let Some(_) = &self.secret_key_bytes {
+        let auth: bool = if let Some(_) = &self.secret_key_bytes {
+            true
+        } else {
+            false
+        };
+        let roles: Vec<String>;
+        if auth {
             match claims {
                 Some(c) => match c.roles {
-                    Some(s) => trace!("{:?}", s.split(",")),
+                    Some(s) => {
+                        roles = s.split(",").map(|t| t.to_owned()).collect();
+                        trace!("{:?}", roles);
+                    }
                     None => return halt(StatusCode::UNAUTHORIZED),
                 },
                 None => return halt(StatusCode::UNAUTHORIZED),
             }
-        }
+        } else {
+            roles = Vec::new();
+        };
 
         let (parts, body) = inbound.into_parts();
 
         trace!("do_post({:?})", &body);
 
-        let concat = body.concat2();
-
         let content_type = Self::get_content_type_as_mime_type(&parts.headers);
         trace!("content_type => {:?}", &content_type);
-        trace!("concat => {:?}", concat);
-        let s = concat
-            .map(move |chunk| {
-                trace!("chunk => {:?}", &chunk);
-                let v = chunk.to_vec();
-                let body = String::from_utf8_lossy(&v).to_string();
-                debug!("body => {:?}", &body);
-                // TODO: arboric::count_post() then arboric::log_counts()
-                super::log_post(content_type, &body);
-                body
-            })
-            .into_stream();
-        let mut r = Request::post(&uri).body(Body::wrap_stream(s)).unwrap();
-        Self::copy_headers(&parts.headers, r.headers_mut());
 
-        let client = Client::new();
-        Box::new(client.request(r))
+        Box::new(body.concat2().from_err().and_then(move |chunk| {
+            trace!("chunk => {:?}", &chunk);
+            let v = chunk.to_vec();
+            let body = String::from_utf8_lossy(&v).to_string();
+            debug!("body => {:?}", &body);
+            if let Ok(counts) = super::parse_post(content_type, &body) {
+                super::log_counts(&counts);
+
+                if auth {
+                    let qmap = protected_queries_map();
+                    if let Some(r) = roles.iter().find(|&role| {
+                        if let Some(vec) = qmap.get(&role.to_string()) {
+                            let all = counts.keys().all(|field| {
+                                trace!("field => {}", &field);
+                                vec.contains(&field)
+                            });
+                            trace!("all => {}", &all);
+                            all
+                        } else {
+                            false
+                        }
+                    }) {
+                        trace!("Found {}", &r);
+                    } else {
+                        return halt(StatusCode::UNAUTHORIZED);
+                    }
+                }
+                let mut r = Request::post(&uri).body(Body::from(body)).unwrap();
+                Self::copy_headers(&parts.headers, r.headers_mut());
+
+                let client = Client::new();
+                Box::new(client.request(r))
+            } else {
+                halt(StatusCode::BAD_REQUEST)
+            }
+        }))
     }
 
     fn get_content_type_as_mime_type(headers: &HeaderMap) -> Option<mime::Mime> {
@@ -242,8 +271,12 @@ impl Service for ProxyService {
     }
 }
 
-fn halt(status_code: StatusCode) -> BoxFut {
+fn respond(status_code: StatusCode) -> Response<Body> {
     let mut response = Response::new(Body::empty());
     *response.status_mut() = status_code;
-    Box::new(future::ok(response))
+    response
+}
+
+fn halt(status_code: StatusCode) -> BoxFut {
+    Box::new(future::ok(respond(status_code)))
 }

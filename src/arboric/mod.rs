@@ -17,16 +17,16 @@ type QueryCountsResult = Result<QueryCounts, ArboricError>;
 
 pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
     if let Ok(counts) = parse_post(content_type, &body) {
-        log_counts(counts);
+        log_counts(&counts);
     }
 }
 
 pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> QueryCountsResult {
+    trace!("parse_post({:?}, {:?})", &content_type, &body);
     let application_graphql: mime::Mime = "application/graphql".parse().unwrap();
-    trace!("log_post({:?}, {:?})", &content_type, &body);
     match content_type {
         Some(ref mime_type) if &application_graphql == mime_type => count_top_level_fields(body),
-        Some(ref mime_type) if mime_type == &mime::APPLICATION_JSON => {
+        Some(ref mime_type) if &mime::APPLICATION_JSON == mime_type => {
             match count_json_query(body) {
                 Ok(results) => Ok(results),
                 Err(err) => {
@@ -46,7 +46,7 @@ pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> QueryCount
     }
 }
 
-pub fn log_counts(map: QueryCounts) {
+pub fn log_counts(map: &QueryCounts) {
     use influx_db_client::{Client, Point, Points, Precision, Value};
     let total: usize = map.values().sum();
     info!(
@@ -61,8 +61,8 @@ pub fn log_counts(map: QueryCounts) {
     for (field, n) in map {
         debug!("{}: {}", &field, &n);
         let point = Point::new("queries")
-            .add_tag("field", Value::String(field))
-            .add_field("n", Value::Integer(n as i64))
+            .add_tag("field", Value::String(field.clone()))
+            .add_field("n", Value::Integer(*n as i64))
             .to_owned();
         points.push(point);
     }
