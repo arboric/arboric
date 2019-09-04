@@ -9,7 +9,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use std::collections::HashMap;
 
-pub mod proxy_service;
+mod proxy;
+mod proxy_service;
+
+pub use proxy::Proxy;
 pub use proxy_service::ProxyService;
 
 type QueryCounts = HashMap<String, usize>;
