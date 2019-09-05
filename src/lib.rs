@@ -4,8 +4,9 @@ use failure::Fail;
 use simplelog::{LevelFilter, SimpleLogger};
 use std::env;
 
-pub mod arboric;
+mod arboric;
 
+pub use crate::arboric::graphql;
 pub use crate::arboric::Proxy;
 
 /// Arboric error type to 'wrap' other, underlying error causes
