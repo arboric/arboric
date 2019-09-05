@@ -61,7 +61,7 @@ const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Trace;
 
 fn get_env_log_level_filter() -> simplelog::LevelFilter {
     if let Ok(val) = env::var("ARBORIC_LOG") {
-        println!("Using {} log level", &val);
+        println!("ARBORIC_LOG => \"{}\"", &val);
         match val.to_lowercase().as_str() {
             "info" => LevelFilter::Info,
             "trace" => LevelFilter::Trace,

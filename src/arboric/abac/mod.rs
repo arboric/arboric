@@ -2,7 +2,7 @@
 
 use crate::graphql::Pattern;
 use graphql_parser::query::Definition::Operation;
-use graphql_parser::query::{Document, OperationDefinition, Selection, SelectionSet};
+use graphql_parser::query::{Document, Field, OperationDefinition, Selection, SelectionSet};
 use log::{debug, error, info, trace, warn};
 
 /// A pdp::Policy represents an ABAC rule, which either
@@ -13,17 +13,32 @@ pub enum Policy {
     Deny(Pattern),
 }
 
+impl Policy {
+    pub fn allow(&self, field: &Field) -> bool {
+        trace!("allow({:?}, {:?}", &self, &field);
+        match &self {
+            Policy::Allow(pattern) => pattern.matches(field),
+            Policy::Deny(pattern) => !pattern.matches(field),
+        }
+    }
+}
+
 pub struct PDP {
     pub rules: Vec<Policy>,
 }
 
 impl PDP {
-    fn new() -> PDP {
+    pub fn new() -> PDP {
         PDP {
-            rules: vec![Policy::Allow(Pattern::parse("query:*"))],
+            rules: vec![Policy::Allow(Pattern::Any)],
         }
     }
+
     pub fn allow(&self, document: &Document) -> bool {
+        trace!("allow({:?})", &document);
+        if self.rules.is_empty() {
+            return false;
+        }
         document.definitions.iter().all(|def| match def {
             Operation(OperationDefinition::Query(query)) => {
                 if let Some(query_name) = &query.name {
@@ -34,18 +49,27 @@ impl PDP {
             Operation(OperationDefinition::SelectionSet(ref selection_set)) => {
                 self.allow_all(&selection_set)
             }
+            Operation(OperationDefinition::Mutation(mutation)) => {
+                if let Some(mutation_name) = &mutation.name {
+                    debug!("mutation.name => {}", mutation_name);
+                }
+                self.allow_all(&mutation.selection_set)
+            }
             _ => {
-                warn!("Don't know how to handle{:?}", def);
+                warn!("Don't know how to handle {:?}", def);
                 false
             }
         })
     }
 
     fn allow_all(&self, selection_set: &SelectionSet) -> bool {
-        selection_set.items.iter().all(|selection| match selection {
-            Selection::Field(_field) => false,
-            // Don't know what to do with FragmentSpread or InlineFragment
-            _ => true,
+        selection_set.items.iter().all(|selection| {
+            trace!("selection => {:?}", &selection);
+            match selection {
+                Selection::Field(field) => self.rules.iter().all(|policy| policy.allow(field)),
+                // Don't know what to do with FragmentSpread or InlineFragment
+                _ => true,
+            }
         })
     }
 }
@@ -56,16 +80,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_pdp_parse() {
+        crate::initialize_logging();
+        graphql_parser::parse_query("mutation Foo {foo(name:\"test\") { id }}").unwrap();
+    }
+
+    #[test]
     fn test_pdp_no_rules() {
+        crate::initialize_logging();
         let pdp = PDP { rules: vec![] };
         let document = graphql_parser::parse_query("{__schema{queryType{name}}}").unwrap();
         assert!(!pdp.allow(&document));
     }
 
     #[test]
-    fn test_default_pdp() {
+    fn test_pdp_default() {
+        crate::initialize_logging();
         let pdp = PDP::new();
-        let document = graphql_parser::parse_query("{__schema{queryType{name}}}").unwrap();
-        assert!(pdp.allow(&document));
+        assert!(pdp.allow(&graphql_parser::parse_query("{__schema{queryType{name}}}").unwrap()));
+        assert!(pdp.allow(
+            &graphql_parser::parse_query("mutation Foo {foo(name:\"test\") { id }}").unwrap()
+        ));
     }
 }
