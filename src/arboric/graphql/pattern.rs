@@ -26,18 +26,20 @@ impl Pattern {
     /// ```
     /// use arboric::graphql::Pattern;
     ///
-    /// assert_eq!(Ok(Pattern::Any), Pattern::parse("*"));
+    /// assert_eq!(Pattern::Any, Pattern::parse("*"));
     /// ```
-    pub fn parse<S: Into<String> + fmt::Display>(pattern: S) -> Result<Pattern, String> {
-        let s = pattern.into();
-        if s == "*" {
-            Ok(Pattern::Any)
-        } else if s.starts_with("query:") {
-            Ok(Pattern::Query(FieldPattern(s.as_str()[6..].to_owned())))
-        } else if s.starts_with("mutation:") {
-            Ok(Pattern::Mutation(FieldPattern(s.as_str()[9..].to_owned())))
+    pub fn parse(pattern: &str) -> Pattern {
+        if pattern == "*" {
+            Pattern::Any
         } else {
-            Err(format!("Invalid pattern \"{}\"!", s))
+            let s = pattern.to_string();
+            if s.starts_with("mutation:") {
+                Pattern::Mutation(FieldPattern(pattern[9..].to_owned()))
+            } else if s.starts_with("query:") {
+                Pattern::Query(FieldPattern(pattern[6..].to_owned()))
+            } else {
+                Pattern::Query(FieldPattern(s))
+            }
         }
     }
 }
@@ -78,14 +80,25 @@ mod tests {
     fn test_pattern_parse() {
         crate::initialize_logging();
         print!("test_pattern_parse()");
-        assert_eq!(Pattern::parse("*"), Ok(Pattern::Any));
+        let s: String = String::from("__type");
+        assert_eq!(
+            Pattern::parse(&s),
+            Pattern::Query(FieldPattern("__type".into()))
+        );
+        println!("s => {}", s);
+        assert_eq!(Pattern::parse("*"), Pattern::Any);
+        assert_eq!(Pattern::parse("*"), Pattern::Any);
+        assert_eq!(
+            Pattern::parse("__schema"),
+            Pattern::Query(FieldPattern("__schema".into()))
+        );
         assert_eq!(
             Pattern::parse("query:*"),
-            Ok(Pattern::Query(FieldPattern("*".into())))
+            Pattern::Query(FieldPattern("*".into()))
         );
         assert_eq!(
             Pattern::parse("mutation:*"),
-            Ok(Pattern::Mutation(FieldPattern("*".into())))
+            Pattern::Mutation(FieldPattern("*".into()))
         );
     }
 }
