@@ -18,7 +18,7 @@ type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     sub: String,
-    iss: String,
+    iss: Option<String>,
     roles: Option<String>,
     iat: Option<i64>,
     exp: Option<i64>,
