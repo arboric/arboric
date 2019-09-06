@@ -100,6 +100,9 @@ mod tests {
     // Import names from outer (for mod tests) scope.
     use super::*;
 
+    use graphql_parser::query::Definition::Operation;
+    use graphql_parser::query::{Field, OperationDefinition, Selection, SelectionSet};
+
     #[test]
     fn test_pattern_parse() {
         crate::initialize_logging();
@@ -108,7 +111,6 @@ mod tests {
             Pattern::parse(&s),
             Pattern::Query(FieldPattern("__type".into()))
         );
-        println!("s => {}", s);
         assert_eq!(Pattern::parse("*"), Pattern::Any);
         assert_eq!(
             Pattern::parse("__schema"),
@@ -132,8 +134,6 @@ mod tests {
     }
 
     fn field(name: &str) -> Field {
-        use graphql_parser::query::SelectionSet;
-
         Field {
             position: pos(1, 1),
             alias: None,
@@ -147,9 +147,24 @@ mod tests {
         }
     }
 
+    fn query(s: &str) -> Field {
+        let doc = graphql_parser::parse_query(&s).unwrap();
+        match doc.definitions.iter().next().unwrap() {
+            Operation(OperationDefinition::SelectionSet(ref selection_set)) => {
+                let first = selection_set.items.iter().next().unwrap();
+                match first {
+                    Selection::Field(field) => field.clone(),
+                    x => panic!("Don't know what to do with {:?}!", x),
+                }
+            }
+            x => panic!("Don't know what to do with {:?}!", x),
+        }
+    }
+
     #[test]
     fn test_field_pattern_matches() {
         assert!(FieldPattern("*".into()).matches(&field("foo")));
         assert!(FieldPattern("foo".into()).matches(&field("foo")));
+        assert!(FieldPattern("foo".into()).matches(&query("{foo{id}}")));
     }
 }
