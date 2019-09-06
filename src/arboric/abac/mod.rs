@@ -12,7 +12,10 @@ use std::borrow::Borrow;
 /// * a list of `MatchAttribute`s, and
 /// * a list of `Rule`s
 #[derive(Debug, PartialEq)]
-pub struct Policy {}
+pub struct Policy {
+    attributes: Vec<MatchAttribute>,
+    rules: Vec<Rule>,
+}
 
 pub trait RequestMatcher {
     fn matches<R: Borrow<Request>>(&self, request: R) -> bool;
@@ -28,9 +31,17 @@ pub enum MatchAttribute {
 }
 
 impl MatchAttribute {
+    // Creates a MatchAttribute::ClaimPresent
     pub fn claim_present(claim: &str) -> MatchAttribute {
         MatchAttribute::ClaimPresent {
             claim: claim.to_owned(),
+        }
+    }
+    // Creates a MatchAttribute::ClaimEquals
+    pub fn claim_equals(claim: &str, value: &str) -> MatchAttribute {
+        MatchAttribute::ClaimEquals {
+            claim: claim.to_owned(),
+            value: value.to_owned(),
         }
     }
 }
@@ -38,12 +49,20 @@ impl MatchAttribute {
 impl RequestMatcher for MatchAttribute {
     fn matches<R: Borrow<Request>>(&self, request: R) -> bool {
         let req = request.borrow();
+        let claims = &req.claims;
         match self {
             MatchAttribute::ClaimPresent { claim } => {
                 trace!("request.claims => {:?}", &req.claims);
                 trace!("claim => {:?}", &claim);
-                req.claims.contains_key(claim)
+                claims.contains_key(claim)
             }
+            MatchAttribute::ClaimEquals { claim, value } => {
+                claims.contains_key(claim) &&
+                match claims.get(claim) {
+                    Some(v) => value == v,
+                    _ => false
+                }
+            },
             x => panic!("Don't know how to handle {:?}!", x),
         }
     }
@@ -123,6 +142,7 @@ mod tests {
     use super::*;
     use frank_jwt::{decode, Algorithm};
     use serde_json::json;
+
     #[test]
     fn test_frank_jwt() {
         let secret_key_hex = "fb9f0a56c2195aa7294f7b076d145bb1a701decd06e8e32cbfdc2f3146a11b3637c5b77d2f98ffb5081af31ae180b69bf2b127ff2496f3c252fcaa20c89d1b019a4639fd26056b6136dd327d118c7d833b357d673d4ba79f1997c4d1d47b74549e0b0e827444fe36dcd7411c0a1384140121e099343d074b6a34c9179ed4687d";
@@ -135,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pdp_match_attributes() {
+    fn test_pdp_match_attributes_claim_present() {
         let json = json!({"sub": "1"});
         let claims = json.as_object().unwrap();
         let request = Request {
@@ -143,6 +163,17 @@ mod tests {
         };
         assert!(MatchAttribute::claim_present("sub").matches(&request));
         assert!(!MatchAttribute::claim_present("roles").matches(&request));
+    }
+
+    #[test]
+    fn test_pdp_match_attributes_claim_equals() {
+        let json = json!({"sub": "1"});
+        let claims = json.as_object().unwrap();
+        let request = Request {
+            claims: claims.to_owned(),
+        };
+        assert!(MatchAttribute::claim_equals("sub", "1").matches(&request));
+        assert!(!MatchAttribute::claim_equals("sub", "2").matches(&request));
     }
 
     #[test]
