@@ -1,10 +1,10 @@
 //! Arboric ABAC (attribute-based access control) modules and functions
 
 use crate::graphql::Pattern;
-use crate::{Claims, Request};
+use crate::Request;
 use graphql_parser::query::Definition::Operation;
 use graphql_parser::query::{Document, Field, OperationDefinition, Selection, SelectionSet};
-use log::{debug, error, info, trace, warn};
+use log::{debug, trace, warn};
 use std::borrow::Borrow;
 
 /// A pdp::Policy comprises:

@@ -1,7 +1,6 @@
 //! The arboric library
 //!
 use failure::Fail;
-use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use simplelog::{LevelFilter, SimpleLogger};
 use std::env;

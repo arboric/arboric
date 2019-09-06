@@ -211,7 +211,7 @@ impl ProxyService {
                 let ref token_str = auth_str[7..];
                 trace!("token => {}", &token_str);
                 match decode(&token_str, secret_key_bytes, Algorithm::HS256) {
-                    Ok((header, payload)) => match payload {
+                    Ok((_header, payload)) => match payload {
                         serde_json::Value::Object(map) => Ok(map),
                         x => {
                             error!("Expeced JSON Object, got {:?}!", x);
