@@ -5,32 +5,32 @@ use graphql_parser::query::Definition::Operation;
 use graphql_parser::query::{Document, Field, OperationDefinition, Selection, SelectionSet};
 use log::{debug, error, info, trace, warn};
 
-/// A pdp::Policy represents an ABAC rule, which either
+/// A pdp::Rule represents an ABAC rule, which either
 /// `Allow` or `Deny` a certain `arboric::graphql::Pattern`
 #[derive(PartialEq, Debug)]
-pub enum Policy {
+pub enum Rule {
     Allow(Pattern),
     Deny(Pattern),
 }
 
-impl Policy {
+impl Rule {
     pub fn allow(&self, field: &Field) -> bool {
         trace!("allow({:?}, {:?}", &self, &field);
         match &self {
-            Policy::Allow(pattern) => pattern.matches(field),
-            Policy::Deny(pattern) => !pattern.matches(field),
+            Rule::Allow(pattern) => pattern.matches(field),
+            Rule::Deny(pattern) => !pattern.matches(field),
         }
     }
 }
 
 pub struct PDP {
-    pub rules: Vec<Policy>,
+    pub rules: Vec<Rule>,
 }
 
 impl PDP {
     pub fn new() -> PDP {
         PDP {
-            rules: vec![Policy::Allow(Pattern::Any)],
+            rules: vec![Rule::Allow(Pattern::Any)],
         }
     }
 
