@@ -11,7 +11,7 @@ use std::fmt;
 ///   * `Any` - or `*` will match anything
 ///   * `Query` - or `query:...` will match a query
 ///   * `Mutation` - or `mutation:...` will match a mutation
-#[derive(PartialEq, Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Pattern {
     Any,
     Query(FieldPattern),
@@ -76,7 +76,7 @@ impl fmt::Display for Pattern {
 }
 
 /// A FieldPattern matches a query or mutation field
-#[derive(PartialEq, Debug)]
+#[derive(Debug, PartialEq)]
 pub struct FieldPattern(String);
 
 impl FieldPattern {

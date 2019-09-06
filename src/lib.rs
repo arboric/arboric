@@ -1,6 +1,8 @@
 //! The arboric library
 //!
 use failure::Fail;
+use serde::{Deserialize, Serialize};
+use serde_json::Map;
 use simplelog::{LevelFilter, SimpleLogger};
 use std::env;
 
@@ -9,6 +11,16 @@ mod arboric;
 pub use crate::arboric::abac;
 pub use crate::arboric::graphql;
 pub use crate::arboric::Proxy;
+
+/// Represents a list of JWT Claims (really just a JSON object)
+pub type Claims = Map<String, serde_json::Value>;
+
+/// An arboric::Request is used to process an incoming GraphQL HTTP API request
+/// for ABAC and logging
+#[derive(Debug, PartialEq)]
+pub struct Request {
+    pub claims: Claims,
+}
 
 /// Arboric error type to 'wrap' other, underlying error causes
 #[derive(Debug, Fail)]

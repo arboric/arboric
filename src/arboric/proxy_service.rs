@@ -1,28 +1,20 @@
 //! Arboric ProxyService which does the actual work of the Proxy
 
+use crate::Claims;
+use frank_jwt::{decode, Algorithm};
 use futures::future;
 use http::header::HeaderMap;
 use hyper::rt::Future;
 use hyper::service::Service;
 use hyper::{Body, Client, Method, Request, Response, StatusCode, Uri};
-use jsonwebtoken::{decode, TokenData, Validation};
 use log::{debug, error, trace, warn};
-use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use simple_error::bail;
 use std::collections::HashMap;
 use std::error::Error;
 
 // Just a simple type alias
 type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    sub: String,
-    iss: Option<String>,
-    roles: Option<String>,
-    iat: Option<i64>,
-    exp: Option<i64>,
-}
 
 #[derive(Debug)]
 pub struct ProxyService {
@@ -118,13 +110,19 @@ impl ProxyService {
         let roles: Vec<String>;
         if auth {
             match claims {
-                Some(c) => match c.roles {
-                    Some(s) => {
-                        roles = s.split(",").map(|t| t.to_owned()).collect();
-                        trace!("{:?}", roles);
+                Some(c) => {
+                    if c.contains_key("roles") {
+                        match c.get("roles").unwrap() {
+                            Value::String(s) => {
+                                roles = s.split(",").map(|t| t.to_owned()).collect();
+                                trace!("{:?}", roles);
+                            }
+                            _ => return halt(StatusCode::UNAUTHORIZED),
+                        }
+                    } else {
+                        return halt(StatusCode::UNAUTHORIZED);
                     }
-                    None => return halt(StatusCode::UNAUTHORIZED),
-                },
+                }
                 None => return halt(StatusCode::UNAUTHORIZED),
             }
         } else {
@@ -205,20 +203,21 @@ impl ProxyService {
     fn get_authorization_token(
         req: &Request<Body>,
         secret_key_bytes: &Vec<u8>,
-    ) -> Result<TokenData<Claims>, Box<dyn Error>> {
-        let validation = Validation {
-            validate_exp: false,
-            ..Default::default()
-        };
-
+    ) -> Result<Claims, Box<dyn Error>> {
         if let Some(authorization) = req.headers().get(http::header::AUTHORIZATION) {
             trace!("{} => {:?}", http::header::AUTHORIZATION, &authorization);
             let auth_str = &authorization.to_str()?;
             if auth_str.starts_with("Bearer ") {
                 let ref token_str = auth_str[7..];
                 trace!("token => {}", &token_str);
-                match decode::<Claims>(&token_str, &secret_key_bytes[..], &validation) {
-                    Ok(token_data) => Ok(token_data),
+                match decode(&token_str, secret_key_bytes, Algorithm::HS256) {
+                    Ok((header, payload)) => match payload {
+                        serde_json::Value::Object(map) => Ok(map),
+                        x => {
+                            error!("Expeced JSON Object, got {:?}!", x);
+                            bail!("401 Unauthorized")
+                        }
+                    },
                     Err(e) => {
                         error!("{}", e);
                         bail!("401 Unauthorized")
@@ -244,10 +243,9 @@ impl Service for ProxyService {
         trace!("req.method() => {:?}", &req.method());
         let claims: Option<Claims>;
         if let Some(ref secret_key_bytes) = &self.secret_key_bytes {
-            if let Ok(jwt) = Self::get_authorization_token(&req, secret_key_bytes) {
-                trace!("{:?}", jwt);
-                claims = Some(jwt.claims);
-                trace!("{:?}", claims);
+            if let Ok(map) = Self::get_authorization_token(&req, secret_key_bytes) {
+                trace!("{:?}", map);
+                claims = Some(map);
             } else {
                 return halt(StatusCode::UNAUTHORIZED);
             }
