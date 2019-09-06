@@ -4,6 +4,7 @@
 
 use graphql_parser::query::Field;
 use regex::Regex;
+use std::borrow::Borrow;
 use std::fmt;
 
 /// A graphql::Pattern can be one of:
@@ -53,7 +54,8 @@ impl Pattern {
         Pattern::Mutation(FieldPattern(s.into()))
     }
 
-    pub fn matches(&self, field: &Field) -> bool {
+    /// Compares this Pattern against the GraphQL AST Field if it matches
+    pub fn matches<F: Borrow<Field>>(&self, field: F) -> bool {
         match self {
             Pattern::Any => true,
             Pattern::Query(ref field_pattern) => field_pattern.matches(field),
@@ -78,12 +80,12 @@ impl fmt::Display for Pattern {
 pub struct FieldPattern(String);
 
 impl FieldPattern {
-    pub fn matches(&self, field: &Field) -> bool {
+    pub fn matches<F: Borrow<Field>>(&self, field: F) -> bool {
         let FieldPattern(s) = self;
         // TODO: compile Regex once
         Regex::new(&s.replace("*", ".*"))
             .unwrap()
-            .is_match(field.name.as_str())
+            .is_match(field.borrow().name.as_str())
     }
 }
 
@@ -163,8 +165,8 @@ mod tests {
 
     #[test]
     fn test_field_pattern_matches() {
-        assert!(FieldPattern("*".into()).matches(&field("foo")));
-        assert!(FieldPattern("foo".into()).matches(&field("foo")));
-        assert!(FieldPattern("foo".into()).matches(&query("{foo{id}}")));
+        assert!(FieldPattern("*".into()).matches(field("foo")));
+        assert!(FieldPattern("foo".into()).matches(field("foo")));
+        assert!(FieldPattern("foo".into()).matches(query("{foo{id}}")));
     }
 }
