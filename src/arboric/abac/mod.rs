@@ -21,8 +21,8 @@ pub trait RequestMatcher {
     fn matches<R: Borrow<Request>>(&self, request: R) -> bool;
 }
 
-/// A pdp:MatchAttribute is a set of rules that are used to match an incoming Request to see if
-/// the ABAC Rules apply to it
+/// A pdp:MatchAttribute is a rule that can be used to match
+/// an incoming Request to see if the associated ACLs apply to it
 #[derive(Debug, PartialEq)]
 pub enum MatchAttribute {
     ClaimPresent { claim: String },
@@ -37,11 +37,20 @@ impl MatchAttribute {
             claim: claim.to_owned(),
         }
     }
+
     // Creates a MatchAttribute::ClaimEquals
     pub fn claim_equals(claim: &str, value: &str) -> MatchAttribute {
         MatchAttribute::ClaimEquals {
             claim: claim.to_owned(),
             value: value.to_owned(),
+        }
+    }
+
+    // Creates a MatchAttribute::ClaimIncludes
+    pub fn claim_includes(claim: &str, element: &str) -> MatchAttribute {
+        MatchAttribute::ClaimIncludes {
+            claim: claim.to_owned(),
+            element: element.to_owned(),
         }
     }
 }
@@ -57,13 +66,24 @@ impl RequestMatcher for MatchAttribute {
                 claims.contains_key(claim)
             }
             MatchAttribute::ClaimEquals { claim, value } => {
-                claims.contains_key(claim) &&
-                match claims.get(claim) {
-                    Some(v) => value == v,
-                    _ => false
-                }
-            },
-            x => panic!("Don't know how to handle {:?}!", x),
+                claims.contains_key(claim)
+                    && match claims.get(claim) {
+                        Some(v) => value == v,
+                        _ => false,
+                    }
+            }
+            MatchAttribute::ClaimIncludes { claim, element } => {
+                claims.contains_key(claim)
+                    && match claims.get(claim) {
+                        Some(v) => v
+                            .as_str()
+                            .unwrap()
+                            .split(",")
+                            .collect::<Vec<&str>>()
+                            .contains(&element.as_ref()),
+                        _ => false,
+                    }
+            }
         }
     }
 }
@@ -152,6 +172,8 @@ mod tests {
         let (header, payload) = decode(&s, &secret_key, Algorithm::HS256).unwrap();
         println!("header => {:?}", &header);
         println!("payload => {:?}", &payload);
+        assert_eq!("HS256", header.as_object().unwrap().get("alg").unwrap());
+        assert_eq!("1", payload.as_object().unwrap().get("sub").unwrap());
     }
 
     #[test]
@@ -174,6 +196,17 @@ mod tests {
         };
         assert!(MatchAttribute::claim_equals("sub", "1").matches(&request));
         assert!(!MatchAttribute::claim_equals("sub", "2").matches(&request));
+    }
+
+    #[test]
+    fn test_pdp_match_attributes_claim_includes() {
+        let json = json!({"roles": "user,admin"});
+        let claims = json.as_object().unwrap();
+        let request = Request {
+            claims: claims.to_owned(),
+        };
+        assert!(MatchAttribute::claim_includes("roles", "admin").matches(&request));
+        assert!(!MatchAttribute::claim_includes("roles", "guest").matches(&request));
     }
 
     #[test]
