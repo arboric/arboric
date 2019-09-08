@@ -7,7 +7,7 @@ use graphql_parser::query::{Document, Field, OperationDefinition, Selection, Sel
 use log::{debug, trace, warn};
 use std::borrow::Borrow;
 
-/// A pdp::Policy comprises:
+/// A abac::Policy comprises:
 ///
 /// * a list of `MatchAttribute`s, and
 /// * a list of `Rule`s
@@ -88,7 +88,7 @@ impl RequestMatcher for MatchAttribute {
     }
 }
 
-/// A pdp::Rule will either `Allow` or `Deny` a certain `arboric::graphql::Pattern`
+/// A abac::Rule will either `Allow` or `Deny` a certain `arboric::graphql::Pattern`
 #[derive(Debug, PartialEq)]
 pub enum Rule {
     Allow(Pattern),
@@ -177,7 +177,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pdp_match_attributes_claim_present() {
+    fn test_abac_match_attributes_claim_present() {
         let json = json!({"sub": "1"});
         let claims = json.as_object().unwrap();
         let request = Request {
@@ -188,7 +188,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pdp_match_attributes_claim_equals() {
+    fn test_abac_match_attributes_claim_equals() {
         let json = json!({"sub": "1"});
         let claims = json.as_object().unwrap();
         let request = Request {
@@ -199,18 +199,19 @@ mod tests {
     }
 
     #[test]
-    fn test_pdp_match_attributes_claim_includes() {
+    fn test_abac_match_attributes_claim_includes() {
         let json = json!({"roles": "user,admin"});
         let claims = json.as_object().unwrap();
         let request = Request {
             claims: claims.to_owned(),
         };
+        assert!(MatchAttribute::claim_includes("roles", "user").matches(&request));
         assert!(MatchAttribute::claim_includes("roles", "admin").matches(&request));
         assert!(!MatchAttribute::claim_includes("roles", "guest").matches(&request));
     }
 
     #[test]
-    fn test_pdp_no_rules() {
+    fn test_abac_no_rules() {
         crate::initialize_logging();
         let pdp = PDP { rules: vec![] };
         let document = graphql_parser::parse_query("{__schema{queryType{name}}}").unwrap();
@@ -218,7 +219,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pdp_default() {
+    fn test_abac_default() {
         crate::initialize_logging();
         let pdp = PDP::new();
         assert!(pdp.allow(&graphql_parser::parse_query("{__schema{queryType{name}}}").unwrap()));
