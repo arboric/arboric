@@ -19,6 +19,7 @@ pub type Claims = Map<String, serde_json::Value>;
 #[derive(Debug, PartialEq)]
 pub struct Request {
     pub claims: Claims,
+    pub document: graphql_parser::query::Document,
 }
 
 /// Arboric error type to 'wrap' other, underlying error causes

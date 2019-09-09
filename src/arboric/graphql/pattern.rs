@@ -2,7 +2,8 @@
 //! GraphQL requests (queries or mutations) by field, type, etc.
 //! Used for ABAC/ACLs, and selective logging.
 
-use graphql_parser::query::Field;
+use graphql_parser::query::{Field, OperationDefinition, Selection};
+use log::{debug, trace, warn};
 use regex::Regex;
 use std::borrow::Borrow;
 use std::fmt;
@@ -55,11 +56,42 @@ impl Pattern {
     }
 
     /// Compares this Pattern against the GraphQL AST Field if it matches
-    pub fn matches<F: Borrow<Field>>(&self, field: F) -> bool {
+    pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
         match self {
             Pattern::Any => true,
-            Pattern::Query(ref field_pattern) => field_pattern.matches(field),
-            Pattern::Mutation(ref field_pattern) => field_pattern.matches(field),
+            Pattern::Query(ref field_pattern) => match operation_definition {
+                OperationDefinition::Query(query) => {
+                    query
+                        .selection_set
+                        .items
+                        .iter()
+                        .any(|selection| match selection {
+                            Selection::Field(field) => field_pattern.matches(field),
+                            _ => false,
+                        })
+                }
+                OperationDefinition::SelectionSet(selection_set) => {
+                    selection_set.items.iter().any(|selection| match selection {
+                        Selection::Field(field) => field_pattern.matches(field),
+                        _ => false,
+                    })
+                }
+                _ => false,
+            },
+            Pattern::Mutation(ref field_pattern) => {
+                trace!("{:?}.matches({:?})", &self, &operation_definition);
+                match operation_definition {
+                    OperationDefinition::Mutation(mutation) => mutation
+                        .selection_set
+                        .items
+                        .iter()
+                        .any(|selection| match selection {
+                            Selection::Field(field) => field_pattern.matches(field),
+                            _ => false,
+                        }),
+                    _ => false,
+                }
+            }
         }
     }
 }
