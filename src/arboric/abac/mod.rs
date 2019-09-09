@@ -66,7 +66,7 @@ impl RequestMatcher for Policy {
     }
 }
 
-/// A pdp:MatchAttribute is a rule that can be used to match
+/// A abac:MatchAttribute is a rule that can be used to match
 /// an incoming Request to see if the associated ACLs apply to it
 #[derive(Debug, PartialEq)]
 pub enum MatchAttribute {
@@ -178,12 +178,14 @@ pub struct PDP {
 }
 
 impl PDP {
+    /// Constructs a PDP with no policies
     pub fn new() -> PDP {
         PDP {
             policies: Vec::new(),
         }
     }
 
+    /// Constructs a default PDP with a single "allow any" Policy.
     pub fn default() -> PDP {
         PDP {
             policies: vec![Policy::allow_any()],
