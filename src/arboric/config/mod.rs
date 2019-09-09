@@ -3,7 +3,7 @@
 
 use crate::abac::PDP;
 use hyper::Uri;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 
 mod builder;
 pub use builder::ListenerBuilder;
@@ -20,6 +20,14 @@ impl Configuration {
         Configuration {
             listeners: Vec::new(),
         }
+    }
+
+    pub fn listener<F>(&mut self, f: F)
+    where
+        F: FnOnce(ListenerBuilder) -> ListenerBuilder,
+    {
+        let listener_builder = f(ListenerBuilder::new());
+        self.listeners.push(listener_builder.build());
     }
 
     pub fn add_listener(&mut self, listener: Listener) {
@@ -126,10 +134,13 @@ mod tests {
         let mut configuration = Configuration::new();
         assert!(configuration.listeners.is_empty());
 
-        let listener = ListenerBuilder::new().bind(127, 0, 0, 1).port(8000).build();
-        configuration.add_listener(listener);
+        configuration.listener(|listener| listener.localhost().port(4000));
         assert!(!configuration.listeners.is_empty());
         assert_eq!(1, configuration.listeners.iter().count());
+        assert_eq!(
+            SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 4000)),
+            configuration.listeners.first().unwrap().listener_address
+        );
     }
 
 }
