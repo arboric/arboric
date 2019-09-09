@@ -1,12 +1,26 @@
 //! The arboric library
 //!
 use failure::Fail;
+use serde_json::Map;
 use simplelog::{LevelFilter, SimpleLogger};
 use std::env;
 
-pub mod arboric;
+mod arboric;
 
+pub use crate::arboric::abac;
+pub use crate::arboric::graphql;
 pub use crate::arboric::Proxy;
+
+/// Represents a list of JWT Claims (really just a JSON object)
+pub type Claims = Map<String, serde_json::Value>;
+
+/// An arboric::Request is used to process an incoming GraphQL HTTP API request
+/// for ABAC and logging
+#[derive(Debug, PartialEq)]
+pub struct Request {
+    pub claims: Claims,
+    pub document: graphql_parser::query::Document,
+}
 
 /// Arboric error type to 'wrap' other, underlying error causes
 #[derive(Debug, Fail)]
@@ -59,7 +73,7 @@ const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Trace;
 
 fn get_env_log_level_filter() -> simplelog::LevelFilter {
     if let Ok(val) = env::var("ARBORIC_LOG") {
-        println!("Using {} log level", &val);
+        println!("ARBORIC_LOG => \"{}\"", &val);
         match val.to_lowercase().as_str() {
             "info" => LevelFilter::Info,
             "trace" => LevelFilter::Trace,

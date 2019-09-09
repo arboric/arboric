@@ -1,3 +1,4 @@
+//! The arboric command line
 extern crate hyper;
 
 use log::trace;

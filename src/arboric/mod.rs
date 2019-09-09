@@ -9,20 +9,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use std::collections::HashMap;
 
+pub mod abac;
+pub mod graphql;
+
 mod proxy;
 mod proxy_service;
 
+// arboric::Proxy
 pub use proxy::Proxy;
+// arboric::ProxyService
 pub use proxy_service::ProxyService;
 
 type QueryCounts = HashMap<String, usize>;
 type QueryCountsResult = Result<QueryCounts, ArboricError>;
-
-pub fn log_post(content_type: Option<mime::Mime>, body: &String) {
-    if let Ok(counts) = parse_post(content_type, &body) {
-        log_counts(&counts);
-    }
-}
 
 pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> QueryCountsResult {
     trace!("parse_post({:?}, {:?})", &content_type, &body);
