@@ -10,6 +10,7 @@ use serde_json::value::Value;
 use std::collections::HashMap;
 
 pub mod abac;
+pub mod config;
 pub mod graphql;
 
 mod proxy;

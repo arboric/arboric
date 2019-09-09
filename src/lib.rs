@@ -8,8 +8,11 @@ use std::env;
 mod arboric;
 
 pub use crate::arboric::abac;
+pub use crate::arboric::config;
 pub use crate::arboric::graphql;
 pub use crate::arboric::Proxy;
+
+pub use config::Configuration;
 
 /// Represents a list of JWT Claims (really just a JSON object)
 pub type Claims = Map<String, serde_json::Value>;

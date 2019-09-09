@@ -173,6 +173,7 @@ impl Rule {
 /// The abac::PDP or Policy Decision Point is responsible for holding
 /// the list of `Policy`s. It evaluates incoming requests and
 /// returns a Permit / Deny decision.
+#[derive(Debug)]
 pub struct PDP {
     policies: Vec<Policy>,
 }
