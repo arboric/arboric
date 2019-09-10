@@ -27,7 +27,7 @@ impl NewService for Proxy {
         Box::new(future::ok(super::ProxyService::new(
             &self.listener.api_uri,
             &self.secret_key_bytes,
-            &self.listener.pdp
+            &self.listener.pdp,
         )))
     }
 }

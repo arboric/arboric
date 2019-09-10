@@ -2,16 +2,16 @@
 //! building arboric::Configuration
 
 use super::{JwtSigningKeySource, Listener};
+use crate::abac::Policy;
 use hyper::Uri;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use crate::abac::Policy;
 
 pub struct ListenerBuilder {
     pub bind_address: IpAddr,
     pub port: u16,
     pub proxy_uri: Option<Uri>,
     pub jwt_signing_key_source: Option<JwtSigningKeySource>,
-    pub policies: Vec<Policy>
+    pub policies: Vec<Policy>,
 }
 
 impl ListenerBuilder {
@@ -21,7 +21,7 @@ impl ListenerBuilder {
             port: 0,
             proxy_uri: None,
             jwt_signing_key_source: None,
-            policies: Vec::new()
+            policies: Vec::new(),
         }
     }
 
