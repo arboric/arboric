@@ -1,16 +1,17 @@
 //! The main proxy that implements hyper::NewService
 //!
+use crate::config::Listener;
+use crate::Configuration;
 use futures::future;
 use hyper::rt::Future;
 use hyper::service::NewService;
 use hyper::{Body, Server};
 use log::{info, trace};
-use std::env;
 
 /// The main Proxy
 #[derive(Debug)]
 pub struct Proxy {
-    api_uri: String,
+    listener: Listener,
     secret_key_bytes: Option<Vec<u8>>,
 }
 
@@ -24,7 +25,7 @@ impl NewService for Proxy {
     fn new_service(&self) -> Self::Future {
         trace!("new_service(&Proxy)");
         Box::new(future::ok(super::ProxyService::new(
-            &self.api_uri,
+            &self.listener.api_uri,
             &self.secret_key_bytes,
         )))
     }
@@ -32,29 +33,26 @@ impl NewService for Proxy {
 
 impl Proxy {
     /// Constructs a new Proxy with the given backend API URI
-    pub fn new<S>(api_uri: S) -> Proxy
-    where
-        S: Into<String>,
-    {
-        let secret_key_bytes = Self::get_secret_key_bytes();
-        Proxy {
-            api_uri: api_uri.into(),
-            secret_key_bytes: secret_key_bytes,
-        }
-    }
-
-    fn get_secret_key_bytes() -> Option<Vec<u8>> {
-        if let Ok(vec) = Self::unsafe_get_secret_key_bytes() {
-            trace!("vec => {:?}", vec);
-            Some(vec)
+    pub fn new(config: Configuration) -> Proxy {
+        if let Some(listener) = config.listeners.first() {
+            let secret_key_bytes = Self::get_secret_key_bytes(&listener);
+            Proxy {
+                listener: (*listener).clone(),
+                secret_key_bytes: secret_key_bytes,
+            }
         } else {
-            None
+            panic!("No listeners configured! See arboric::Configuration::listener()")
         }
     }
 
-    fn unsafe_get_secret_key_bytes() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        let secret = env::var("SECRET_KEY_BASE")?;
-        Ok(hex::decode(&secret)?)
+    fn get_secret_key_bytes(listener: &Listener) -> Option<Vec<u8>> {
+        if let Some(key_source) = &listener.jwt_signing_key_source {
+            if let Ok(vec) = key_source.get_secret_key_bytes() {
+                trace!("vec => {:?}", vec);
+                return Some(vec);
+            }
+        }
+        None
     }
 
     pub fn run(self) {

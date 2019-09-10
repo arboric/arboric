@@ -18,7 +18,7 @@ type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send
 
 #[derive(Debug)]
 pub struct ProxyService {
-    pub api_uri: String,
+    pub api_uri: http::Uri,
     pub secret_key_bytes: Option<Vec<u8>>,
 }
 
@@ -32,7 +32,7 @@ fn protected_queries_map() -> HashMap<String, Vec<String>> {
 }
 
 impl ProxyService {
-    pub fn new(api_uri: &String, secret_key_bytes: &Option<Vec<u8>>) -> ProxyService {
+    pub fn new(api_uri: &http::Uri, secret_key_bytes: &Option<Vec<u8>>) -> ProxyService {
         ProxyService {
             api_uri: api_uri.clone(),
             secret_key_bytes: secret_key_bytes.clone(),
@@ -75,9 +75,8 @@ impl ProxyService {
     }
 
     fn compute_get_uri(&self, req: &Request<Body>) -> Uri {
-        let api_uri: Uri = self.api_uri.parse().unwrap();
-        let authority = api_uri.authority_part().unwrap();
-        let scheme = api_uri.scheme_str().unwrap();
+        let authority = self.api_uri.authority_part().unwrap();
+        let scheme = self.api_uri.scheme_str().unwrap();
         let params = req.uri().query().unwrap();
         let pandq = format!("/graphql?{}", params);
         Uri::builder()
@@ -99,7 +98,7 @@ impl ProxyService {
         let req_uri = inbound.uri();
         debug!("req_uri => {}", req_uri);
 
-        let uri: hyper::Uri = self.api_uri.parse().unwrap();
+        let uri: hyper::Uri = self.api_uri.clone();
         debug!("uri => {}", uri);
 
         let auth: bool = if let Some(_) = &self.secret_key_bytes {

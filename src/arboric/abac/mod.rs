@@ -3,9 +3,8 @@
 use crate::graphql::Pattern;
 use crate::Request;
 use graphql_parser::query::Definition::Operation;
-use graphql_parser::query::{Document, Field, OperationDefinition, Selection, SelectionSet};
-use log::{debug, trace, warn};
-use std::borrow::Borrow;
+use graphql_parser::query::OperationDefinition;
+use log::{trace, warn};
 
 pub trait RequestMatcher {
     fn matches(&self, request: &Request) -> bool;
@@ -15,7 +14,7 @@ pub trait RequestMatcher {
 ///
 /// * a list of `MatchAttribute`s, and
 /// * a list of `Rule`s
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Policy {
     attributes: Vec<MatchAttribute>,
     rules: Vec<Rule>,
@@ -66,9 +65,9 @@ impl RequestMatcher for Policy {
     }
 }
 
-/// A pdp:MatchAttribute is a rule that can be used to match
+/// A abac:MatchAttribute is a rule that can be used to match
 /// an incoming Request to see if the associated ACLs apply to it
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MatchAttribute {
     Any,
     ClaimPresent { claim: String },
@@ -135,7 +134,7 @@ impl RequestMatcher for MatchAttribute {
 }
 
 /// A abac::Rule will either `Allow` or `Deny` a certain `arboric::graphql::Pattern`
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Rule {
     Allow(Pattern),
     Deny(Pattern),
@@ -173,17 +172,20 @@ impl Rule {
 /// The abac::PDP or Policy Decision Point is responsible for holding
 /// the list of `Policy`s. It evaluates incoming requests and
 /// returns a Permit / Deny decision.
+#[derive(Debug, Clone)]
 pub struct PDP {
     policies: Vec<Policy>,
 }
 
 impl PDP {
+    /// Constructs a PDP with no policies
     pub fn new() -> PDP {
         PDP {
             policies: Vec::new(),
         }
     }
 
+    /// Constructs a default PDP with a single "allow any" Policy.
     pub fn default() -> PDP {
         PDP {
             policies: vec![Policy::allow_any()],
@@ -208,6 +210,8 @@ mod tests {
     use super::*;
     use frank_jwt::{decode, Algorithm};
     use serde_json::json;
+
+    use std::borrow::Borrow;
 
     #[test]
     fn test_frank_jwt() {
