@@ -29,6 +29,9 @@ impl Pattern {
     ///
     /// assert_eq!(Pattern::parse("*"), Pattern::Any);
     /// assert_eq!(Pattern::parse("query:*"), Pattern::query("*"));
+    /// assert_eq!(Pattern::parse("foo"), Pattern::query("foo"));
+    /// assert_eq!(Pattern::parse("query:foo"), Pattern::query("foo"));
+    /// assert_eq!(Pattern::parse("mutation:bar"), Pattern::mutation("bar"));
     /// ```
     pub fn parse(pattern: &str) -> Pattern {
         if pattern == "*" {

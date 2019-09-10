@@ -143,7 +143,7 @@ pub fn initialize_logging() {
     let _ = SimpleLogger::init(level_filter, log_config);
 }
 
-const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Trace;
+const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Debug;
 
 fn get_env_log_level_filter() -> simplelog::LevelFilter {
     if let Ok(val) = env::var("ARBORIC_LOG") {
