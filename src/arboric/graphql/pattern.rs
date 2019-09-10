@@ -56,6 +56,23 @@ impl Pattern {
     }
 
     /// Compares this Pattern against the GraphQL AST Field if it matches
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use arboric::graphql::Pattern;
+    /// use graphql_parser::query::Definition::Operation;
+    /// use graphql_parser::query::OperationDefinition;
+    ///
+    /// let doc = graphql_parser::parse_query("{hero{id name}}").unwrap();
+    /// let op = doc.definitions.first().unwrap();
+    /// if let Operation(od) = op {
+    ///     assert!(Pattern::parse("*").matches(od));
+    ///     assert!(Pattern::parse("query:*").matches(od));
+    ///     assert!(Pattern::parse("query:hero").matches(od));
+    ///     assert!(!Pattern::parse("mutation:createHero").matches(od));
+    /// }
+    ///
     pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
         trace!("matches({:?}, {:?})", &self, &operation_definition);
         match self {
@@ -140,9 +157,8 @@ mod tests {
     #[test]
     fn test_pattern_parse() {
         crate::initialize_logging();
-        let s: String = String::from("__type");
         assert_eq!(
-            Pattern::parse(&s),
+            Pattern::parse("__type"),
             Pattern::Query(FieldPattern("__type".into()))
         );
         assert_eq!(Pattern::parse("*"), Pattern::Any);
@@ -158,6 +174,24 @@ mod tests {
             Pattern::parse("mutation:*"),
             Pattern::Mutation(FieldPattern("*".into()))
         );
+    }
+
+    #[test]
+    fn test_pattern_matches() {
+        crate::initialize_logging();
+        let doc = graphql_parser::parse_query("{hero{id name}}").unwrap();
+        let op = doc.definitions.first().unwrap();
+        if let Operation(od) = op {
+            assert!(Pattern::parse("*").matches(od));
+            assert!(Pattern::parse("query:*").matches(od));
+            assert!(Pattern::parse("query:hero").matches(od));
+            assert!(!Pattern::parse("mutation:createHero").matches(od));
+        } else {
+            panic!(
+                "Expected Definition::Operation(OperationDefintion), got {:?}!",
+                &op
+            );
+        }
     }
 
     fn pos(line: usize, column: usize) -> graphql_parser::Pos {
