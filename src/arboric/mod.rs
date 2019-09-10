@@ -2,7 +2,7 @@
 //! in the `arboric::` namespace
 
 use graphql_parser::query::Definition::Operation;
-use graphql_parser::query::{parse_query, OperationDefinition, SelectionSet};
+use graphql_parser::query::{parse_query, Document, OperationDefinition, SelectionSet};
 use log::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
@@ -21,9 +21,9 @@ pub use proxy::Proxy;
 pub use proxy_service::ProxyService;
 
 type QueryCounts = HashMap<String, usize>;
-type QueryCountsResult = crate::Result<QueryCounts>;
+type ParsePostResult = crate::Result<Option<(Document, QueryCounts)>>;
 
-pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> QueryCountsResult {
+pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> ParsePostResult {
     trace!("parse_post({:?}, {:?})", &content_type, &body);
     let application_graphql: mime::Mime = "application/graphql".parse().unwrap();
     match content_type {
@@ -39,7 +39,7 @@ pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> QueryCount
         }
         Some(mime_type) => {
             warn!("Don't know how to handle {}!", &mime_type);
-            Ok(HashMap::new())
+            Ok(None)
         }
         None => {
             warn!("No content-type specified, will try to parse as application/graphql");
@@ -87,7 +87,7 @@ struct GraphQLJSONQuery {
     variables: Option<HashMap<String, Value>>,
 }
 
-fn count_json_query(body: &str) -> QueryCountsResult {
+fn count_json_query(body: &str) -> ParsePostResult {
     trace!("count_json_query({})", &body);
     let q: GraphQLJSONQuery = serde_json::from_str(body)?;
     trace!("{:?}", &q);
@@ -96,7 +96,7 @@ fn count_json_query(body: &str) -> QueryCountsResult {
 }
 
 /// Counts the top level fields in the given GraphQL query string
-fn count_top_level_fields(query: &str) -> QueryCountsResult {
+fn count_top_level_fields(query: &str) -> ParsePostResult {
     trace!("count_top_level_fields({:?})", &query);
     let mut results: HashMap<String, usize> = HashMap::new();
     let document = parse_query(&query)?;
@@ -117,7 +117,7 @@ fn count_top_level_fields(query: &str) -> QueryCountsResult {
         }
     }
 
-    return Ok(results);
+    return Ok(Some((document, results)));
 }
 
 fn update_results(results: &mut HashMap<String, usize>, selection_set: &SelectionSet) {
@@ -145,7 +145,8 @@ mod tests {
         crate::initialize_logging();
         let mut expected: QueryCounts = HashMap::new();
         expected.insert("foo".into(), 1);
-        assert_eq!(count_top_level_fields("{foo{id}}").unwrap(), expected);
+        let (_, counts) = count_top_level_fields("{foo{id}}").unwrap().unwrap();
+        assert_eq!(counts, expected);
         let q = "
         {
             foo(id: 1) {
@@ -157,6 +158,7 @@ mod tests {
         }
         ";
         expected.insert("bar".into(), 1);
-        assert_eq!(count_top_level_fields(&q).unwrap(), expected);
+        let (_, counts2) = count_top_level_fields(&q).unwrap().unwrap();
+        assert_eq!(counts2, expected);
     }
 }

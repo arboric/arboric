@@ -57,6 +57,7 @@ impl Pattern {
 
     /// Compares this Pattern against the GraphQL AST Field if it matches
     pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
+        trace!("matches({:?}, {:?})", &self, &operation_definition);
         match self {
             Pattern::Any => true,
             Pattern::Query(ref field_pattern) => match operation_definition {
@@ -79,7 +80,6 @@ impl Pattern {
                 _ => false,
             },
             Pattern::Mutation(ref field_pattern) => {
-                trace!("{:?}.matches({:?})", &self, &operation_definition);
                 match operation_definition {
                     OperationDefinition::Mutation(mutation) => mutation
                         .selection_set

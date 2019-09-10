@@ -14,10 +14,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut config = arboric::Configuration::new();
     config.listener(|listener| {
+        let policy = arboric::abac::Policy::allow_any();
         listener
             .localhost()
             .port(4000)
             .proxy(API_URI.parse::<Uri>().unwrap())
+            .jwt_from_env_hex("SECRET_KEY_BASE")
+            .add_policy(policy)
     });
 
     run(config);

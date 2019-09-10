@@ -4,12 +4,14 @@
 use super::{JwtSigningKeySource, Listener};
 use hyper::Uri;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use crate::abac::Policy;
 
 pub struct ListenerBuilder {
     pub bind_address: IpAddr,
     pub port: u16,
     pub proxy_uri: Option<Uri>,
     pub jwt_signing_key_source: Option<JwtSigningKeySource>,
+    pub policies: Vec<Policy>
 }
 
 impl ListenerBuilder {
@@ -19,6 +21,7 @@ impl ListenerBuilder {
             port: 0,
             proxy_uri: None,
             jwt_signing_key_source: None,
+            policies: Vec::new()
         }
     }
 
@@ -60,13 +63,18 @@ impl ListenerBuilder {
         self
     }
 
+    pub fn add_policy(mut self, policy: Policy) -> ListenerBuilder {
+        self.policies.push(policy);
+        self
+    }
+
     pub fn build(self) -> Listener {
         Listener {
             listener_address: SocketAddr::new(self.bind_address, self.port),
             listener_path: None,
             api_uri: self.proxy_uri.unwrap(),
             jwt_signing_key_source: self.jwt_signing_key_source,
-            pdp: crate::abac::PDP::default(),
+            pdp: crate::abac::PDP::with_policies(self.policies),
         }
     }
 }

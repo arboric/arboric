@@ -165,7 +165,12 @@ mod tests {
         let mut configuration = Configuration::new();
         assert!(configuration.listeners.is_empty());
 
-        configuration.listener(|listener| listener.localhost().port(4000).proxy("http://localhost:3000/graphql".parse::<Uri>().unwrap()));
+        configuration.listener(|listener| {
+            listener
+                .localhost()
+                .port(4000)
+                .proxy("http://localhost:3000/graphql".parse::<Uri>().unwrap())
+        });
         assert!(!configuration.listeners.is_empty());
         assert_eq!(1, configuration.listeners.iter().count());
         assert_eq!(

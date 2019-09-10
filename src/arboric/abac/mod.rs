@@ -21,7 +21,7 @@ pub struct Policy {
 }
 
 impl Policy {
-    fn allow_any() -> Policy {
+    pub fn allow_any() -> Policy {
         Policy {
             attributes: vec![MatchAttribute::Any],
             rules: vec![Rule::Allow(Pattern::Any)],
@@ -34,9 +34,10 @@ impl Policy {
             .iter()
             .all(|attribute| attribute.matches(request))
         {
-            request.document.definitions.iter().all(|def| match def {
+            let all = request.document.definitions.iter().all(|def| match def {
                 Operation(operation_definition) => self.rules.iter().all(|rule| {
                     if rule.matches(operation_definition) {
+                        trace!("Rule {:?} matches {:?}", &rule, &operation_definition);
                         if let Some(b) = rule.allows(operation_definition) {
                             b
                         } else {
@@ -50,7 +51,9 @@ impl Policy {
                     warn!("Don't know how to handle {:?}", def);
                     false
                 }
-            })
+            });
+            trace!("all? {}", all);
+            all
         } else {
             false
         }
@@ -153,6 +156,7 @@ impl Rule {
         match &self {
             Rule::Allow(pattern) => {
                 if pattern.matches(operation_definition) {
+                    trace!("returning Some(true)");
                     Some(true)
                 } else {
                     None
@@ -160,6 +164,7 @@ impl Rule {
             }
             Rule::Deny(pattern) => {
                 if pattern.matches(operation_definition) {
+                    trace!("returning Some(false)");
                     Some(false)
                 } else {
                     None
@@ -183,6 +188,10 @@ impl PDP {
         PDP {
             policies: Vec::new(),
         }
+    }
+
+    pub fn with_policies(policies: Vec<Policy>) -> PDP {
+        PDP { policies: policies }
     }
 
     /// Constructs a default PDP with a single "allow any" Policy.
