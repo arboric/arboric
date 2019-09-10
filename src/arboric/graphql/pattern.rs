@@ -3,7 +3,7 @@
 //! Used for ABAC/ACLs, and selective logging.
 
 use graphql_parser::query::{Field, OperationDefinition, Selection};
-use log::{debug, trace, warn};
+use log::trace;
 use regex::Regex;
 use std::borrow::Borrow;
 use std::fmt;
@@ -12,7 +12,7 @@ use std::fmt;
 ///   * `Any` - or `*` will match anything
 ///   * `Query` - or `query:...` will match a query
 ///   * `Mutation` - or `mutation:...` will match a mutation
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Any,
     Query(FieldPattern),
@@ -108,7 +108,7 @@ impl fmt::Display for Pattern {
 }
 
 /// A FieldPattern matches a query or mutation field
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FieldPattern(String);
 
 impl FieldPattern {

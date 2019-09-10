@@ -3,15 +3,16 @@
 
 use crate::abac::PDP;
 use hyper::Uri;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::env;
+use std::net::{IpAddr, SocketAddr};
 
-mod builder;
-pub use builder::ListenerBuilder;
+mod listener_builder;
+pub use listener_builder::ListenerBuilder;
 
 /// The 'root' level configuration
 #[derive(Debug)]
 pub struct Configuration {
-    listeners: Vec<Listener>,
+    pub listeners: Vec<Listener>,
 }
 
 impl Configuration {
@@ -37,7 +38,7 @@ impl Configuration {
 
 /// A [KeyEncoding](arboric::config::KeyEncoding) just tells us whether the value is encoded as
 /// hex or base64
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum KeyEncoding {
     Bytes,
     Hex,
@@ -57,7 +58,7 @@ pub enum KeyEncoding {
 /// * the string value or file contents taken as 'raw' bytes,
 /// * a hex encoded value, or
 /// * a base64 encoded value
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum JwtSigningKeySource {
     Value(String, KeyEncoding),
     FromEnv {
@@ -92,6 +93,34 @@ impl JwtSigningKeySource {
             encoding: KeyEncoding::Base64,
         }
     }
+
+    pub fn get_secret_key_bytes(&self) -> crate::Result<Vec<u8>> {
+        match self {
+            JwtSigningKeySource::Value(secret, encoding) => match encoding {
+                KeyEncoding::Hex => Ok(hex::decode(&secret)?),
+                KeyEncoding::Base64 => Ok(base64::decode(&secret)?),
+                x => Err(crate::ArboricError::general(format!(
+                    "Not yet implemented: {:?}!",
+                    x
+                ))),
+            },
+            JwtSigningKeySource::FromEnv { key, encoding } => {
+                let secret = env::var(key)?;
+                match encoding {
+                    KeyEncoding::Hex => Ok(hex::decode(&secret)?),
+                    KeyEncoding::Base64 => Ok(base64::decode(&secret)?),
+                    x => Err(crate::ArboricError::general(format!(
+                        "Not yet implemented: {:?}!",
+                        x
+                    ))),
+                }
+            }
+            x => Err(crate::ArboricError::general(format!(
+                "{:?} not yet implemented!",
+                x
+            ))),
+        }
+    }
 }
 
 /// An [Listener](arboric::config::Listener) defines:
@@ -101,23 +130,23 @@ impl JwtSigningKeySource {
 ///   * an optional 'path' or prefix, e.g. `"/graphql"`
 /// * a back-end API URL
 /// * an `arboric::abac::PDP` or set of ABAC policies
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Listener {
-    listener_address: SocketAddr,
-    listener_path: Option<String>,
-    api_uri: Uri,
-    jwt_signing_key_source: Option<JwtSigningKeySource>,
-    pdp: crate::abac::PDP,
+    pub listener_address: SocketAddr,
+    pub listener_path: Option<String>,
+    pub api_uri: Uri,
+    pub jwt_signing_key_source: Option<JwtSigningKeySource>,
+    pub pdp: crate::abac::PDP,
 }
 
 impl Listener {
     /// Construct a [Listener](arboric::config::Listener) that binds to the given
     /// [IpAddr](std::net::IpAddr), port, and forwards to the API at the given [Uri](hyper::Uri)
-    pub fn ip_addr_and_port(ip_addr: IpAddr, port: u16, to_uri: Uri) -> Listener {
+    pub fn ip_addr_and_port(ip_addr: IpAddr, port: u16, api_uri: &Uri) -> Listener {
         Listener {
             listener_address: SocketAddr::new(ip_addr, port),
             listener_path: None,
-            api_uri: to_uri,
+            api_uri: api_uri.clone(),
             jwt_signing_key_source: None,
             pdp: PDP::default(),
         }
@@ -129,12 +158,14 @@ mod tests {
     // Import names from outer (for mod tests) scope.
     use super::*;
 
+    use std::net::{Ipv4Addr, SocketAddrV4};
+
     #[test]
     fn test_config_builder() {
         let mut configuration = Configuration::new();
         assert!(configuration.listeners.is_empty());
 
-        configuration.listener(|listener| listener.localhost().port(4000));
+        configuration.listener(|listener| listener.localhost().port(4000).proxy("http://localhost:3000/graphql".parse::<Uri>().unwrap()));
         assert!(!configuration.listeners.is_empty());
         assert_eq!(1, configuration.listeners.iter().count());
         assert_eq!(

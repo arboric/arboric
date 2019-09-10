@@ -1,12 +1,15 @@
 //! An arboric::config::Builder allows for a fluent interface for
 //! building arboric::Configuration
 
+use super::{JwtSigningKeySource, Listener};
 use hyper::Uri;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 pub struct ListenerBuilder {
     pub bind_address: IpAddr,
     pub port: u16,
+    pub proxy_uri: Option<Uri>,
+    pub jwt_signing_key_source: Option<JwtSigningKeySource>,
 }
 
 impl ListenerBuilder {
@@ -14,6 +17,8 @@ impl ListenerBuilder {
         ListenerBuilder {
             bind_address: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             port: 0,
+            proxy_uri: None,
+            jwt_signing_key_source: None,
         }
     }
 
@@ -41,8 +46,27 @@ impl ListenerBuilder {
         self
     }
 
-    pub fn build(&self) -> crate::config::Listener {
-        let uri: Uri = "http://localhost:3001".parse().unwrap();
-        crate::config::Listener::ip_addr_and_port(self.bind_address, self.port, uri)
+    pub fn proxy<I>(mut self, i: I) -> ListenerBuilder
+    where
+        I: Into<Uri>,
+    {
+        self.proxy_uri = Some(i.into());
+        self
+    }
+
+    pub fn jwt_from_env_hex(mut self, jwt_env_key: &str) -> ListenerBuilder {
+        self.jwt_signing_key_source =
+            Some(JwtSigningKeySource::hex_from_env(jwt_env_key.to_string()));
+        self
+    }
+
+    pub fn build(self) -> Listener {
+        Listener {
+            listener_address: SocketAddr::new(self.bind_address, self.port),
+            listener_path: None,
+            api_uri: self.proxy_uri.unwrap(),
+            jwt_signing_key_source: self.jwt_signing_key_source,
+            pdp: crate::abac::PDP::default(),
+        }
     }
 }

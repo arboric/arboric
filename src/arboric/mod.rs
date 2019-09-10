@@ -1,10 +1,9 @@
 //! The arboric module. Functions and structs in this file are available
 //! in the `arboric::` namespace
 
-use crate::ArboricError;
 use graphql_parser::query::Definition::Operation;
 use graphql_parser::query::{parse_query, OperationDefinition, SelectionSet};
-use log::{debug, error, info, trace, warn};
+use log::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::value::Value;
 use std::collections::HashMap;
@@ -22,7 +21,7 @@ pub use proxy::Proxy;
 pub use proxy_service::ProxyService;
 
 type QueryCounts = HashMap<String, usize>;
-type QueryCountsResult = Result<QueryCounts, ArboricError>;
+type QueryCountsResult = crate::Result<QueryCounts>;
 
 pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> QueryCountsResult {
     trace!("parse_post({:?}, {:?})", &content_type, &body);
@@ -100,28 +99,24 @@ fn count_json_query(body: &str) -> QueryCountsResult {
 fn count_top_level_fields(query: &str) -> QueryCountsResult {
     trace!("count_top_level_fields({:?})", &query);
     let mut results: HashMap<String, usize> = HashMap::new();
-    match parse_query(&query) {
-        Ok(document) => {
-            trace!("document => {:?}", &document);
-            for def in document.definitions.iter() {
-                match def {
-                    Operation(OperationDefinition::Query(query)) => {
-                        if let Some(query_name) = &query.name {
-                            debug!("query.name => {}", query_name);
-                        }
-                        update_results(&mut results, &query.selection_set);
-                    }
-                    Operation(OperationDefinition::SelectionSet(selection_set)) => {
-                        update_results(&mut results, &selection_set);
-                    }
-                    _ => warn!("{:?}", def),
+    let document = parse_query(&query)?;
+
+    trace!("document => {:?}", &document);
+    for def in document.definitions.iter() {
+        match def {
+            Operation(OperationDefinition::Query(query)) => {
+                if let Some(query_name) = &query.name {
+                    debug!("query.name => {}", query_name);
                 }
+                update_results(&mut results, &query.selection_set);
             }
-        }
-        Err(e) => {
-            error!("graphql_parser::query::ParseError({})", e);
+            Operation(OperationDefinition::SelectionSet(selection_set)) => {
+                update_results(&mut results, &selection_set);
+            }
+            _ => warn!("{:?}", def),
         }
     }
+
     return Ok(results);
 }
 
@@ -149,7 +144,6 @@ mod tests {
     fn test_count_top_level_fields() {
         crate::initialize_logging();
         let mut expected: QueryCounts = HashMap::new();
-        assert_eq!(count_top_level_fields("{}").unwrap(), expected);
         expected.insert("foo".into(), 1);
         assert_eq!(count_top_level_fields("{foo{id}}").unwrap(), expected);
         let q = "

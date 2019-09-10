@@ -1,6 +1,7 @@
 //! The arboric command line
 extern crate hyper;
 
+use http::Uri;
 use log::trace;
 use std::error::Error;
 
@@ -12,13 +13,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     arboric::initialize_logging();
 
     let mut config = arboric::Configuration::new();
-    config.listener(|listener| listener.localhost().port(4000));
+    config.listener(|listener| {
+        listener
+            .localhost()
+            .port(4000)
+            .proxy(API_URI.parse::<Uri>().unwrap())
+    });
 
-    let proxy = arboric::Proxy::new(API_URI);
+    run(config);
+    Ok(())
+}
+
+/// Run the Arboric proxy server according to the given configuration
+pub fn run(config: arboric::Configuration) {
+    let proxy = arboric::Proxy::new(config);
     trace!("{:?}", proxy);
 
     proxy.run();
-
-    println!("Ok");
-    Ok(())
 }
