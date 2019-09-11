@@ -4,6 +4,7 @@ extern crate hyper;
 #[macro_use]
 extern crate clap;
 
+use http::Uri;
 use log::trace;
 use std::error::Error;
 
@@ -19,13 +20,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         .subcommand(SubCommand::with_name("start").about("start the arboric server"))
         .get_matches();
 
+    // TODO: Move to arboric::Configuration
     arboric::initialize_logging();
 
-    let proxy = arboric::Proxy::new(API_URI);
+    let mut config = arboric::Configuration::new();
+    config.listener(|listener| {
+        let policy = arboric::abac::Policy::allow_any();
+        listener
+            .localhost()
+            .port(4000)
+            .proxy(API_URI.parse::<Uri>().unwrap())
+            .jwt_from_env_hex("SECRET_KEY_BASE")
+            .add_policy(policy)
+    });
+
+    run(config);
+    Ok(())
+}
+
+/// Run the Arboric proxy server according to the given configuration
+pub fn run(config: arboric::Configuration) {
+    let proxy = arboric::Proxy::new(config);
     trace!("{:?}", proxy);
 
     proxy.run();
-
-    println!("Ok");
-    Ok(())
 }

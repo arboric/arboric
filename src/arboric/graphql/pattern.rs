@@ -3,7 +3,7 @@
 //! Used for ABAC/ACLs, and selective logging.
 
 use graphql_parser::query::{Field, OperationDefinition, Selection};
-use log::{debug, trace, warn};
+use log::trace;
 use regex::Regex;
 use std::borrow::Borrow;
 use std::fmt;
@@ -12,7 +12,7 @@ use std::fmt;
 ///   * `Any` - or `*` will match anything
 ///   * `Query` - or `query:...` will match a query
 ///   * `Mutation` - or `mutation:...` will match a mutation
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Any,
     Query(FieldPattern),
@@ -29,6 +29,9 @@ impl Pattern {
     ///
     /// assert_eq!(Pattern::parse("*"), Pattern::Any);
     /// assert_eq!(Pattern::parse("query:*"), Pattern::query("*"));
+    /// assert_eq!(Pattern::parse("foo"), Pattern::query("foo"));
+    /// assert_eq!(Pattern::parse("query:foo"), Pattern::query("foo"));
+    /// assert_eq!(Pattern::parse("mutation:bar"), Pattern::mutation("bar"));
     /// ```
     pub fn parse(pattern: &str) -> Pattern {
         if pattern == "*" {
@@ -56,7 +59,25 @@ impl Pattern {
     }
 
     /// Compares this Pattern against the GraphQL AST Field if it matches
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use arboric::graphql::Pattern;
+    /// use graphql_parser::query::Definition::Operation;
+    /// use graphql_parser::query::OperationDefinition;
+    ///
+    /// let doc = graphql_parser::parse_query("{hero{id name}}").unwrap();
+    /// let op = doc.definitions.first().unwrap();
+    /// if let Operation(od) = op {
+    ///     assert!(Pattern::parse("*").matches(od));
+    ///     assert!(Pattern::parse("query:*").matches(od));
+    ///     assert!(Pattern::parse("query:hero").matches(od));
+    ///     assert!(!Pattern::parse("mutation:createHero").matches(od));
+    /// }
+    ///
     pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
+        trace!("matches({:?}, {:?})", &self, &operation_definition);
         match self {
             Pattern::Any => true,
             Pattern::Query(ref field_pattern) => match operation_definition {
@@ -79,7 +100,6 @@ impl Pattern {
                 _ => false,
             },
             Pattern::Mutation(ref field_pattern) => {
-                trace!("{:?}.matches({:?})", &self, &operation_definition);
                 match operation_definition {
                     OperationDefinition::Mutation(mutation) => mutation
                         .selection_set
@@ -108,7 +128,7 @@ impl fmt::Display for Pattern {
 }
 
 /// A FieldPattern matches a query or mutation field
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FieldPattern(String);
 
 impl FieldPattern {
@@ -140,9 +160,8 @@ mod tests {
     #[test]
     fn test_pattern_parse() {
         crate::initialize_logging();
-        let s: String = String::from("__type");
         assert_eq!(
-            Pattern::parse(&s),
+            Pattern::parse("__type"),
             Pattern::Query(FieldPattern("__type".into()))
         );
         assert_eq!(Pattern::parse("*"), Pattern::Any);
@@ -158,6 +177,24 @@ mod tests {
             Pattern::parse("mutation:*"),
             Pattern::Mutation(FieldPattern("*".into()))
         );
+    }
+
+    #[test]
+    fn test_pattern_matches() {
+        crate::initialize_logging();
+        let doc = graphql_parser::parse_query("{hero{id name}}").unwrap();
+        let op = doc.definitions.first().unwrap();
+        if let Operation(od) = op {
+            assert!(Pattern::parse("*").matches(od));
+            assert!(Pattern::parse("query:*").matches(od));
+            assert!(Pattern::parse("query:hero").matches(od));
+            assert!(!Pattern::parse("mutation:createHero").matches(od));
+        } else {
+            panic!(
+                "Expected Definition::Operation(OperationDefintion), got {:?}!",
+                &op
+            );
+        }
     }
 
     fn pos(line: usize, column: usize) -> graphql_parser::Pos {

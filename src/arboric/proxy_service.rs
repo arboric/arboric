@@ -1,5 +1,6 @@
 //! Arboric ProxyService which does the actual work of the Proxy
 
+use crate::abac::PDP;
 use crate::Claims;
 use frank_jwt::{decode, Algorithm};
 use futures::future;
@@ -8,9 +9,7 @@ use hyper::rt::Future;
 use hyper::service::Service;
 use hyper::{Body, Client, Method, Request, Response, StatusCode, Uri};
 use log::{debug, error, trace, warn};
-use serde_json::Value;
 use simple_error::bail;
-use std::collections::HashMap;
 use std::error::Error;
 
 // Just a simple type alias
@@ -18,24 +17,17 @@ type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send
 
 #[derive(Debug)]
 pub struct ProxyService {
-    pub api_uri: String,
+    pub api_uri: http::Uri,
     pub secret_key_bytes: Option<Vec<u8>>,
-}
-
-fn protected_queries_map() -> HashMap<String, Vec<String>> {
-    let mut m = HashMap::new();
-    m.insert(
-        "admin".to_string(),
-        vec!["__schema".to_string(), "__type".to_string()],
-    );
-    m
+    pub pdp: PDP,
 }
 
 impl ProxyService {
-    pub fn new(api_uri: &String, secret_key_bytes: &Option<Vec<u8>>) -> ProxyService {
+    pub fn new(api_uri: &http::Uri, secret_key_bytes: &Option<Vec<u8>>, pdp: &PDP) -> ProxyService {
         ProxyService {
             api_uri: api_uri.clone(),
             secret_key_bytes: secret_key_bytes.clone(),
+            pdp: pdp.clone(),
         }
     }
 
@@ -75,9 +67,8 @@ impl ProxyService {
     }
 
     fn compute_get_uri(&self, req: &Request<Body>) -> Uri {
-        let api_uri: Uri = self.api_uri.parse().unwrap();
-        let authority = api_uri.authority_part().unwrap();
-        let scheme = api_uri.scheme_str().unwrap();
+        let authority = self.api_uri.authority_part().unwrap();
+        let scheme = self.api_uri.scheme_str().unwrap();
         let params = req.uri().query().unwrap();
         let pandq = format!("/graphql?{}", params);
         Uri::builder()
@@ -99,67 +90,39 @@ impl ProxyService {
         let req_uri = inbound.uri();
         debug!("req_uri => {}", req_uri);
 
-        let uri: hyper::Uri = self.api_uri.parse().unwrap();
+        let uri: hyper::Uri = self.api_uri.clone();
         debug!("uri => {}", uri);
 
-        let auth: bool = if let Some(_) = &self.secret_key_bytes {
-            true
-        } else {
-            false
-        };
-        let roles: Vec<String>;
+        let auth = self.secret_key_bytes.is_some();
         if auth {
-            match claims {
-                Some(c) => {
-                    if c.contains_key("roles") {
-                        match c.get("roles").unwrap() {
-                            Value::String(s) => {
-                                roles = s.split(",").map(|t| t.to_owned()).collect();
-                                trace!("{:?}", roles);
-                            }
-                            _ => return halt(StatusCode::UNAUTHORIZED),
-                        }
-                    } else {
-                        return halt(StatusCode::UNAUTHORIZED);
-                    }
-                }
-                None => return halt(StatusCode::UNAUTHORIZED),
+            if claims.is_none() {
+                return halt(StatusCode::UNAUTHORIZED);
             }
-        } else {
-            roles = Vec::new();
         };
 
         let (parts, body) = inbound.into_parts();
-
         trace!("do_post({:?})", &body);
 
         let content_type = Self::get_content_type_as_mime_type(&parts.headers);
         trace!("content_type => {:?}", &content_type);
+
+        // TODO: Figure out the proper lifetime annotations and stop
+        // cloning everything
+        let pdp = self.pdp.clone();
 
         Box::new(body.concat2().from_err().and_then(move |chunk| {
             trace!("chunk => {:?}", &chunk);
             let v = chunk.to_vec();
             let body = String::from_utf8_lossy(&v).to_string();
             debug!("body => {:?}", &body);
-            if let Ok(counts) = super::parse_post(content_type, &body) {
+            if let Ok(Some((document, counts))) = super::parse_post(content_type, &body) {
                 super::log_counts(&counts);
-
                 if auth {
-                    let qmap = protected_queries_map();
-                    if let Some(r) = roles.iter().find(|&role| {
-                        if let Some(vec) = qmap.get(&role.to_string()) {
-                            let all = counts.keys().all(|field| {
-                                trace!("field => {}", &field);
-                                vec.contains(&field)
-                            });
-                            trace!("all => {}", &all);
-                            all
-                        } else {
-                            false
-                        }
-                    }) {
-                        trace!("Found {}", &r);
-                    } else {
+                    let request = crate::Request {
+                        claims: claims.unwrap(),
+                        document,
+                    };
+                    if !pdp.allows(&request) {
                         return halt(StatusCode::UNAUTHORIZED);
                     }
                 }

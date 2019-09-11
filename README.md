@@ -56,7 +56,7 @@ curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bear
 ## Benchmarking (using `ab`)
 
 ```
-ab -b test/multi.json -T "application/json" -n 1000 -c 10 --data http://127.0.0.1:4000/
+ab -p test/multi.json -T "application/json" -n 1000 -c 10 --data http://127.0.0.1:4000/
 ```
 
 With JWT and `"admin"` role:

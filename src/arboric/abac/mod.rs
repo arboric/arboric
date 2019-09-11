@@ -3,9 +3,8 @@
 use crate::graphql::Pattern;
 use crate::Request;
 use graphql_parser::query::Definition::Operation;
-use graphql_parser::query::{Document, Field, OperationDefinition, Selection, SelectionSet};
-use log::{debug, trace, warn};
-use std::borrow::Borrow;
+use graphql_parser::query::OperationDefinition;
+use log::{trace, warn};
 
 pub trait RequestMatcher {
     fn matches(&self, request: &Request) -> bool;
@@ -15,14 +14,14 @@ pub trait RequestMatcher {
 ///
 /// * a list of `MatchAttribute`s, and
 /// * a list of `Rule`s
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Policy {
     attributes: Vec<MatchAttribute>,
     rules: Vec<Rule>,
 }
 
 impl Policy {
-    fn allow_any() -> Policy {
+    pub fn allow_any() -> Policy {
         Policy {
             attributes: vec![MatchAttribute::Any],
             rules: vec![Rule::Allow(Pattern::Any)],
@@ -35,9 +34,10 @@ impl Policy {
             .iter()
             .all(|attribute| attribute.matches(request))
         {
-            request.document.definitions.iter().all(|def| match def {
+            let all = request.document.definitions.iter().all(|def| match def {
                 Operation(operation_definition) => self.rules.iter().all(|rule| {
                     if rule.matches(operation_definition) {
+                        trace!("Rule {:?} matches {:?}", &rule, &operation_definition);
                         if let Some(b) = rule.allows(operation_definition) {
                             b
                         } else {
@@ -51,7 +51,9 @@ impl Policy {
                     warn!("Don't know how to handle {:?}", def);
                     false
                 }
-            })
+            });
+            trace!("all? {}", all);
+            all
         } else {
             false
         }
@@ -66,9 +68,9 @@ impl RequestMatcher for Policy {
     }
 }
 
-/// A pdp:MatchAttribute is a rule that can be used to match
+/// A abac:MatchAttribute is a rule that can be used to match
 /// an incoming Request to see if the associated ACLs apply to it
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MatchAttribute {
     Any,
     ClaimPresent { claim: String },
@@ -135,14 +137,23 @@ impl RequestMatcher for MatchAttribute {
 }
 
 /// A abac::Rule will either `Allow` or `Deny` a certain `arboric::graphql::Pattern`
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Rule {
     Allow(Pattern),
     Deny(Pattern),
 }
 
 impl Rule {
+    pub fn allow(s: &str) -> Rule {
+        Rule::Allow(Pattern::parse(s))
+    }
+
+    pub fn deny(s: &str) -> Rule {
+        Rule::Deny(Pattern::parse(s))
+    }
+
     pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
+        trace!("matches({:?}, {:?})", &self, &operation_definition);
         match &self {
             Rule::Allow(pattern) => pattern.matches(operation_definition),
             Rule::Deny(pattern) => pattern.matches(operation_definition),
@@ -154,6 +165,7 @@ impl Rule {
         match &self {
             Rule::Allow(pattern) => {
                 if pattern.matches(operation_definition) {
+                    trace!("returning Some(true)");
                     Some(true)
                 } else {
                     None
@@ -161,6 +173,7 @@ impl Rule {
             }
             Rule::Deny(pattern) => {
                 if pattern.matches(operation_definition) {
+                    trace!("returning Some(false)");
                     Some(false)
                 } else {
                     None
@@ -173,17 +186,24 @@ impl Rule {
 /// The abac::PDP or Policy Decision Point is responsible for holding
 /// the list of `Policy`s. It evaluates incoming requests and
 /// returns a Permit / Deny decision.
+#[derive(Debug, Clone)]
 pub struct PDP {
     policies: Vec<Policy>,
 }
 
 impl PDP {
+    /// Constructs a PDP with no policies
     pub fn new() -> PDP {
         PDP {
             policies: Vec::new(),
         }
     }
 
+    pub fn with_policies(policies: Vec<Policy>) -> PDP {
+        PDP { policies: policies }
+    }
+
+    /// Constructs a default PDP with a single "allow any" Policy.
     pub fn default() -> PDP {
         PDP {
             policies: vec![Policy::allow_any()],
@@ -208,6 +228,8 @@ mod tests {
     use super::*;
     use frank_jwt::{decode, Algorithm};
     use serde_json::json;
+
+    use std::borrow::Borrow;
 
     #[test]
     fn test_frank_jwt() {
@@ -254,6 +276,51 @@ mod tests {
     }
 
     #[test]
+    fn test_abac_rule_matches() {
+        crate::initialize_logging();
+        let doc = graphql_parser::parse_query("{foo{bar}}").unwrap();
+        let op = doc.definitions.first().unwrap();
+        if let Operation(od) = op {
+            let allow_any = Rule::Allow(Pattern::Any);
+            assert!(allow_any.matches(&od));
+            assert!(allow_any.allows(&od).unwrap());
+
+            let allow_foo = Rule::allow("foo");
+            assert!(allow_foo.matches(&od));
+            assert!(allow_foo.allows(&od).unwrap());
+
+            let allow_query_foo = Rule::allow("query:foo");
+            assert!(allow_query_foo.matches(&od));
+            assert!(allow_query_foo.allows(&od).unwrap());
+
+            let allow_mutation_foo = Rule::allow("mutation:foo");
+            assert!(!allow_mutation_foo.matches(&od));
+            assert!(allow_mutation_foo.allows(&od).is_none());
+
+            let deny_all = Rule::Deny(Pattern::Any);
+            assert!(deny_all.matches(&od));
+            assert!(!deny_all.allows(&od).unwrap());
+
+            let deny_foo = Rule::deny("foo");
+            assert!(deny_foo.matches(&od));
+            assert!(!deny_foo.allows(&od).unwrap());
+
+            let deny_query_foo = Rule::deny("query:foo");
+            assert!(deny_query_foo.matches(&od));
+            assert!(!deny_query_foo.allows(&od).unwrap());
+
+            let deny_mutation_foo = Rule::deny("mutation:foo");
+            assert!(!deny_mutation_foo.matches(&od));
+            assert!(deny_mutation_foo.allows(&od).is_none());
+        } else {
+            panic!(
+                "Expected Definition::Operation(OperationDefintion), got {:?}!",
+                &op
+            );
+        }
+    }
+
+    #[test]
     fn test_pdp_no_rules() {
         crate::initialize_logging();
         let pdp = PDP::new();
@@ -291,22 +358,22 @@ mod tests {
             policies: vec![user_policy, admin_policy],
         };
 
-        assert!(!pdp.allows(&request(json!({}), "{hero{name}}")));
+        assert!(!pdp.allows(&request(json!({}), "{foo{name}}")));
         let user_claims = json!({"sub": "1"});
-        assert!(pdp.allows(&request(&user_claims, "{hero{name}}")));
-        assert!(pdp.allows(&request(&user_claims, "query Hero {hero{name}}")));
+        assert!(pdp.allows(&request(&user_claims, "{foo{name}}")));
+        assert!(pdp.allows(&request(&user_claims, "query foo {foo{name}}")));
         assert!(!pdp.allows(&request(&user_claims, "{__schema{queryType{name}}}")));
         assert!(!pdp.allows(&request(
             user_claims,
-            "mutation CreateHero {createHero(name:\"Shazam!\") {hero{id}}}"
+            "mutation Createfoo {createfoo(name:\"Shazam!\") {foo{id}}}"
         )));
         let admin_claims = json!({"sub": "2", "roles": "user,admin"});
-        assert!(pdp.allows(&request(&admin_claims, "{hero{name}}")));
-        assert!(pdp.allows(&request(&admin_claims, "query Hero {hero{name}}")));
+        assert!(pdp.allows(&request(&admin_claims, "{foo{name}}")));
+        assert!(pdp.allows(&request(&admin_claims, "query foo {foo{name}}")));
         assert!(pdp.allows(&request(&admin_claims, "{__schema{queryType{name}}}")));
         assert!(pdp.allows(&request(
             admin_claims,
-            "mutation CreateHero {createHero(name:\"Shazam!\") {hero{id}}}"
+            "mutation Createfoo {createfoo(name:\"Shazam!\") {foo{id}}}"
         )));
     }
 
