@@ -5,6 +5,7 @@ volumes:
 services:
   test_api:
     image: aisrael/graphql-dotnet-examples
+    container_name: test_api
     ports:
       - 3001:80
   influxdb:
