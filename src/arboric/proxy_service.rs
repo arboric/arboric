@@ -126,11 +126,11 @@ impl ProxyService {
                         return halt(StatusCode::UNAUTHORIZED);
                     }
                 }
-                let mut r = Request::post(&uri).body(Body::from(body)).unwrap();
-                Self::copy_headers(&parts.headers, r.headers_mut());
+                let mut outbound = Request::post(&uri).body(Body::from(body)).unwrap();
+                Self::copy_headers(&parts.headers, outbound.headers_mut());
 
                 let client = Client::new();
-                Box::new(client.request(r))
+                Box::new(client.request(outbound))
             } else {
                 halt(StatusCode::BAD_REQUEST)
             }
