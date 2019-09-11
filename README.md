@@ -1,86 +1,64 @@
 Arboric GraphQL API Gateway
 ====
 
-## Proof-of-Concept Roadmap
+Arboric is the first, and so far only API proxy / gateway dedicated specifically for GraphQL. It aims to provide several key features:
+
+#### Auditing / Metering
+
+Currently supports logging of query and mutation fields and counts to InfluxDB. In the near future, Arboric aims to:
+
+* allow selectively logging requests metadata such as JWT claims & values
+* support logging to Kafka
+
+#### Authentication
+
+Currently, Arboric can enforce verification of a JWT `Authorization: Bearer` token using a supplied HS256 signing key (via environment variable). In the near future, it aims to support:
+
+* Supplying the HS256 signing key as a hex, base64, or 'raw' value from the environment, directly as run-time argument or configuration value, or from a file
+* Support for RS256 asymmetric token verification
+
+##### Authorization (ABAC)
+
+Arboric provides Attribute Based Access Control that allows great flexibility in access controls. Currently, it supports matching:
+
+* JWT claim presence
+* JWT claim equality
+* JWT claim inclusion (e.g. `claims["roles"] includes "admin"` will match `"roles": "user, admin"`)
+
+It also supports `Allow` or `Deny` rules based on GraphQL pattern matching. For example:
+
+* `foo` or `query:foo` matches a query for the field `foo`
+* `mutation:doSomething` matches the mutation `doSomething`
+* `*` or `query:*` matches any query, while
+* `mutation:*` matches any mutation
+
+In the future, Arboric aims to allow:
+
+* nested fields matching, e.g.
+  * `hero.secretIdentity`
+  * `hero.friends.secretIdentity`
+  * `**.secretIdentity`
+* matching by GraphQL type, e.g. `type:Hero`
+* matching by type _and_ field, e.g. `type:Hero{secretIdentity}`
+
+### Feature Wishlist
+
+* TLS/SSL edge termination
+* Two-way TLS certificate authentication/validation from edge to backend
+* Multiple listeners on a single server process
+
+## Versions
+
+### 0.2 Alpha
+
+* [x] #10 ABAC (Attribute Based Access Control), allows for
+  * Matching by claim presence, equality, or inclusion
+* [x] #13 Configuration model
+* [ ] #15 Read configuration from YAML
+* [ ] #12 CLI arguments processor
+
+### 0.1 Proof-of-Concept (2019-09-03)
 
 * [x] JWT Authentication
 * [x] Logging to InfluxDB
 * [x] Role and Path-based Access Control Lists (black/white list)
-
-## To test
-
-### Without JWT authentication
-
-```
-docker-compose up
-```
-
-```
-cargo run
-```
-
-```
-curl -w "\n" -X POST -H "Content-Type: application/graphql" --data "@test/heroes.gql" http://localhost:4000
-```
-
-Or
-
-```
-curl -w "\n" -X POST -H "Content-Type: application/json" --data "@test/heroes.json" http://localhost:4000
-```
-
-### With JWT authentication
-
-```
-$ SECRET_KEY_BASE=fb9f0a56c2195aa7294f7b076d145bb1a701decd06e8e32cbfdc2f3146a11b3637c5b77d2f98ffb5081af31ae180b69bf2b127ff2496f3c252fcaa20c89d1b019a4639fd26056b6136dd327d118c7d833b357d673d4ba79f1997c4d1d47b74549e0b0e827444fe36dcd7411c0a1384140121e099343d074b6a34c9179ed4687d cargo run
-```
-
-```
-curl -w "\n" -X POST -H "Content-Type: application/graphql" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo" --data "@test/heroes.gql" http://localhost:4000
-```
-
-Or
-
-```
-curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo" --data "@test/heroes.json" http://localhost:4000
-```
-
-### Testing RBAC
-
-Using a JWT with `"admin"` role:
-
-```
-curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE" --data "@test/admin_only.json" http://localhost:4000
-```
-
-## Benchmarking (using `ab`)
-
-```
-ab -p test/multi.json -T "application/json" -n 1000 -c 10 --data http://127.0.0.1:4000/
-```
-
-With JWT and `"admin"` role:
-
-```
-ab -p test/admin_only.json -T "application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE" -n 1000 -c 10 --data http://127.0.0.1:4000/
-```
-
-### As a Proxy (with Authentication)
-
-```
-curl -w "\n" -x localhost:4000 -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo"  --data "@test/heroes.json" http://localhost:3000/graphql
-```
-
-## InfluxDB and Grafana
-
-```
-docker exec -it influxdb influx -execute 'create database glances'
-```
-
-```
-glances --export influxdb
-```
-
-```
-curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "db=glances" --data-urlencode "q=SELECT * from \"localhost.cpu\" limit 1"
-```
