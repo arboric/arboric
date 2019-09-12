@@ -4,35 +4,36 @@ extern crate hyper;
 #[macro_use]
 extern crate clap;
 
-use http::Uri;
-use log::trace;
-use std::error::Error;
+use failure::Error;
+use log::{debug, trace};
 
-use clap::{App, SubCommand};
-
-const API_URI: &str = "http://localhost:3001/graphql";
+use clap::{App, Arg, SubCommand};
 
 /// The `arboric` CLI entrypoint
-fn main() -> Result<(), Box<dyn Error>> {
-    let _matches = App::new("Arboric")
+fn main() -> Result<(), Error> {
+    let matches = App::new("Arboric")
         .version(crate_version!())
         .about("GraphQL API Gateway")
+        .arg(
+            Arg::with_name("config")
+                .short("f")
+                .long("config")
+                .value_name("FILE")
+                .help("Specify the configuration file to use (currently supports only YAML)")
+                .takes_value(true),
+        )
         .subcommand(SubCommand::with_name("start").about("start the arboric server"))
         .get_matches();
+
+    let config_file = matches
+        .value_of("config")
+        .unwrap_or("/var/arboric/config.yml");
+    debug!("Loading configuration from: {}", config_file);
 
     // TODO: Move to arboric::Configuration
     arboric::initialize_logging();
 
-    let mut config = arboric::Configuration::new();
-    config.listener(|listener| {
-        let policy = arboric::abac::Policy::allow_any();
-        listener
-            .localhost()
-            .port(4000)
-            .proxy(API_URI.parse::<Uri>().unwrap())
-            .jwt_from_env_hex("SECRET_KEY_BASE")
-            .add_policy(policy)
-    });
+    let config = arboric::config::yaml::read_yaml_configuration(config_file)?;
 
     run(config);
     Ok(())

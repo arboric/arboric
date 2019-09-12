@@ -22,13 +22,38 @@
 //! ```
 
 use crate::Configuration;
+use http::Uri;
 use serde::{Deserialize, Serialize};
 
 /// Read the Configuration from the specified YAML file
-pub fn read_yaml_configuraiton(filename: &str) -> crate::Result<crate::Configuration> {
+pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configuration> {
     let f = std::fs::File::open(filename)?;
     let yaml_config: YamlConfig = serde_yaml::from_reader(f)?;
-    let config = Configuration::new();
+
+    let mut config = Configuration::new();
+    if let Some(listeners) = yaml_config.listeners {
+        for listener_config in listeners.iter() {
+            config.listener(|mut listener| {
+                listener = if listener_config.bind == "localhost" {
+                    listener.localhost()
+                } else {
+                    let ip_addr = listener_config.bind.parse::<std::net::IpAddr>().unwrap();
+                    listener.bind_addr(ip_addr)
+                };
+                listener = listener
+                    .port(listener_config.port)
+                    .proxy(listener_config.proxy.parse::<Uri>().unwrap());
+                if listener_config.jwt_signing_key.from_env.encoding == "hex" {
+                    listener =
+                        listener.jwt_from_env_hex(&listener_config.jwt_signing_key.from_env.key);
+                }
+                // TODO: Allow specifiying policies in YAML
+                let policy = crate::abac::Policy::allow_any();
+                listener.add_policy(policy)
+            })
+        }
+    }
+
     Ok(config)
 }
 
@@ -63,7 +88,7 @@ pub struct File {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Listener {
     pub bind: String,
-    pub port: u32,
+    pub port: u16,
     pub proxy: String,
     pub jwt_signing_key: JwtSigningKey,
 }
