@@ -1,22 +1,26 @@
 [package]
 name = "arboric"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Alistair A. Israel <aisrael@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+base64 = "0.10"
 failure = "0.1"
 futures = "0.1"
+frank_jwt = "3.1.1"
 graphql-parser = "0.2.3"
 hex = "0.3.2"
 http = "0.1"
 hyper = "0.12"
-influx_db_client = "^0.3.6"
-jsonwebtoken = "6"
+influx_db_client = "0.3.6"
 log = "0.4"
 mime = "0.3.13"
+regex = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-simplelog = "^0.6.0"
+serde_yaml = "0.8"
+simplelog = "0.7.1"
 simple-error = "0.2.1"
 tokio = "0.1"
+clap = "2.33.0"

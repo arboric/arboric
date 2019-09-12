@@ -1,82 +1,110 @@
 Arboric GraphQL API Gateway
 ====
 
-## Proof-of-Concept Roadmap
+**Current version:** 0.2 Alpha
 
-* [x] JWT Authentication
-* [x] Logging to InfluxDB
-* [x] Role and Path-based Access Control Lists (black/white list)
+Arboric is the first, and so far only API proxy / gateway dedicated specifically for GraphQL. It aims to provide several key features:
 
-## To test
+#### Auditing / Metering
 
-### Without JWT authentication
+Currently supports logging of query and mutation fields and counts to InfluxDB. In the near future, Arboric aims to:
 
-```
-docker-compose up
-```
+* allow selectively logging requests metadata such as JWT claims & values
+* support logging to Kafka
 
-```
-cargo run
-```
+#### Authentication
 
-```
-curl -w "\n" -X POST -H "Content-Type: application/graphql" --data "@test/heroes.gql" http://localhost:4000
-```
+Currently, Arboric can enforce verification of a JWT `Authorization: Bearer` token using a supplied HS256 signing key (via environment variable). In the near future, it aims to support:
 
-Or
+* Supplying the HS256 signing key as a hex, base64, or 'raw' value from the environment, directly as run-time argument or configuration value, or from a file
+* Support for RS256 asymmetric token verification
 
-```
-curl -w "\n" -X POST -H "Content-Type: application/json" --data "@test/heroes.json" http://localhost:4000
-```
+##### Authorization (ABAC)
 
-### With JWT authentication
+Arboric provides Attribute Based Access Control that allows great flexibility in access controls. Currently, it supports matching:
 
-```
-$ SECRET_KEY_BASE=fb9f0a56c2195aa7294f7b076d145bb1a701decd06e8e32cbfdc2f3146a11b3637c5b77d2f98ffb5081af31ae180b69bf2b127ff2496f3c252fcaa20c89d1b019a4639fd26056b6136dd327d118c7d833b357d673d4ba79f1997c4d1d47b74549e0b0e827444fe36dcd7411c0a1384140121e099343d074b6a34c9179ed4687d cargo run
-```
+* JWT claim presence
+* JWT claim equality
+* JWT claim inclusion (e.g. `claims["roles"] includes "admin"` will match `"roles": "user, admin"`)
 
-```
-curl -w "\n" -X POST -H "Content-Type: application/graphql" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo" --data "@test/heroes.gql" http://localhost:4000
-```
+It also supports `Allow` or `Deny` rules based on GraphQL pattern matching. For example:
 
-Or
+* `foo` or `query:foo` matches a query for the field `foo`
+* `mutation:doSomething` matches the mutation `doSomething`
+* `*` or `query:*` matches any query, while
+* `mutation:*` matches any mutation
 
-```
-curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo" --data "@test/heroes.json" http://localhost:4000
-```
+In the future, Arboric aims to allow:
 
-### Testing RBAC
+* nested fields matching, e.g.
+  * `hero.secretIdentity`
+  * `hero.friends.secretIdentity`
+  * `**.secretIdentity`
+* matching by GraphQL type, e.g. `type:Hero`
+* matching by type _and_ field, e.g. `type:Hero{secretIdentity}`
 
-Using a JWT with `"admin"` role:
+### Feature Wishlist
 
-```
-curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE" --data "@test/admin_only.json" http://localhost:4000
-```
+* TLS/SSL edge termination
+* Two-way TLS certificate authentication/validation from edge to backend
+* Multiple listeners on a single server process
 
-## Benchmarking (using `ab`)
+## To Use
 
-With JWT and `"admin"` role:
+Currently, Arboric is not yet distributed in binary. In the future, we intend to make Arboric available as binary packages for Linux and Mac OS, as well as a Docker image.
 
-```
-ab -p test/admin_only.json -T "application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE" -n 1000 -c 10 --data http://127.0.0.1:4000/
-```
+To build Arboric requires:
 
-### As a Proxy (with Authentication)
+* Rust 1.37.0
+
+
+#### Clone this repository
 
 ```
-curl -w "\n" -x localhost:4000 -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo"  --data "@test/heroes.json" http://localhost:3000/graphql
+git clone https://gitlab.com/arboric/arboric
 ```
 
-## InfluxDB and Grafana
+#### Build the binary
 
 ```
-docker exec -it influxdb influx -execute 'create database glances'
+cargo build --release
 ```
 
-```
-glances --export influxdb
-```
+#### Run `arboric` with the sample config file
 
 ```
-curl -G 'http://localhost:8086/query?pretty=true' --data-urlencode "db=glances" --data-urlencode "q=SELECT * from \"localhost.cpu\" limit 1"
+./target/release/arboric -f etc/arboric/config.yml start
 ```
+
+That will start Arboric listening on port 4000, forwarding requests to `http://localhost:3001/graphql`, and validating the JWT `Authorization: Bearer` token using the `SECRET_KEY_BASE` (hexadecimal) environment variable value
+
+## Roadmap
+
+### 0.2.1 Alpha 1
+
+* [ ] Configurable log level
+* [ ] File logger
+* [ ] Configurable policies
+* [ ] Configurable InfluxDB logging
+
+### 0.3 Beta
+
+* [ ] Allow for multiple Listeners
+* [ ] Arboric API (in GraphQL, of course)
+* [ ] Allow for run-time configuration (via the API)
+
+## Versions
+
+### 0.2 Alpha (2019-09-12)
+
+* ABAC (Attribute Based Access Control), allows for
+  * Matching by claim presence, equality, or inclusion
+* Configuration model
+* Read configuration from YAML
+* CLI arguments processor
+
+### 0.1 Proof-of-Concept (2019-09-03)
+
+* JWT Authentication
+* Logging to InfluxDB
+* Role and Path-based Access Control Lists (black/white list)

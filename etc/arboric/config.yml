@@ -1,0 +1,16 @@
+arboric:
+  # 'global' config goes here
+  log:
+    console:
+      level: info
+    file:
+      location: /var/log/arboric.log
+      level: debug
+listeners:
+- bind: localhost
+  port: 4000
+  proxy: http://localhost:3001/graphql
+  jwt_signing_key:
+    from_env:
+      key: SECRET_KEY_BASE
+      encoding: hex
