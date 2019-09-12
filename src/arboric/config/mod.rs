@@ -9,6 +9,8 @@ use std::net::{IpAddr, SocketAddr};
 mod listener_builder;
 pub use listener_builder::ListenerBuilder;
 
+pub mod yaml;
+
 /// The 'root' level configuration
 #[derive(Debug)]
 pub struct Configuration {
