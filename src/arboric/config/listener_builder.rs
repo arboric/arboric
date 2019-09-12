@@ -57,9 +57,8 @@ impl ListenerBuilder {
         self
     }
 
-    pub fn jwt_from_env_hex(mut self, jwt_env_key: &str) -> ListenerBuilder {
-        self.jwt_signing_key_source =
-            Some(JwtSigningKeySource::hex_from_env(jwt_env_key.to_string()));
+    pub fn jwt_from_env_hex<S: Into<String>>(mut self, jwt_env_key: S) -> ListenerBuilder {
+        self.jwt_signing_key_source = Some(JwtSigningKeySource::hex_from_env(jwt_env_key.into()));
         self
     }
 

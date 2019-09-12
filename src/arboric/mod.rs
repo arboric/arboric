@@ -12,9 +12,12 @@ pub mod abac;
 pub mod config;
 pub mod graphql;
 
+mod error;
 mod proxy;
 mod proxy_service;
 
+// arboric::ArboricError;
+pub use error::ArboricError;
 // arboric::Proxy
 pub use proxy::Proxy;
 // arboric::ProxyService
