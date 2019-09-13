@@ -11,6 +11,7 @@ use std::collections::HashMap;
 pub mod abac;
 pub mod config;
 pub mod graphql;
+pub mod influxdb;
 
 mod error;
 mod proxy;
@@ -51,7 +52,7 @@ pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> ParsePostR
     }
 }
 
-pub fn log_counts(map: &QueryCounts) {
+pub fn log_counts(influx_db_backend: &influxdb::Backend, map: &QueryCounts) {
     use influx_db_client::{Client, Point, Points, Precision, Value};
     let total: usize = map.values().sum();
     info!(

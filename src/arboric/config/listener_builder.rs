@@ -6,12 +6,14 @@ use crate::abac::Policy;
 use hyper::Uri;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+/// A ListenerBuilder implements the fluent-syntax builder for
+/// [arboric::Configuration](arboric::Configuration)
 pub struct ListenerBuilder {
-    pub bind_address: IpAddr,
-    pub port: u16,
-    pub proxy_uri: Option<Uri>,
-    pub jwt_signing_key_source: Option<JwtSigningKeySource>,
-    pub policies: Vec<Policy>,
+    bind_address: IpAddr,
+    port: u16,
+    proxy_uri: Option<Uri>,
+    jwt_signing_key_source: Option<JwtSigningKeySource>,
+    policies: Vec<Policy>,
 }
 
 impl ListenerBuilder {
@@ -74,6 +76,7 @@ impl ListenerBuilder {
             api_uri: self.proxy_uri.unwrap(),
             jwt_signing_key_source: self.jwt_signing_key_source,
             pdp: crate::abac::PDP::with_policies(self.policies),
+            influx_db_backend: None,
         }
     }
 }
