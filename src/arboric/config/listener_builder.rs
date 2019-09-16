@@ -3,18 +3,24 @@
 
 use super::{JwtSigningKeySource, Listener};
 use crate::abac::Policy;
+use crate::arboric::influxdb;
 use hyper::Uri;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+/// A ListenerBuilder implements the fluent-syntax builder for
+/// [arboric::Configuration](arboric::Configuration)
 pub struct ListenerBuilder {
-    pub bind_address: IpAddr,
-    pub port: u16,
-    pub proxy_uri: Option<Uri>,
-    pub jwt_signing_key_source: Option<JwtSigningKeySource>,
-    pub policies: Vec<Policy>,
+    bind_address: IpAddr,
+    port: u16,
+    proxy_uri: Option<Uri>,
+    jwt_signing_key_source: Option<JwtSigningKeySource>,
+    policies: Vec<Policy>,
+    influx_db_backend: Option<influxdb::Backend>,
 }
 
 impl ListenerBuilder {
+    // Constructs a new ListenerBuilder with no JWT signing key source,
+    // an empty Policy list, and no query logging
     pub fn new() -> ListenerBuilder {
         ListenerBuilder {
             bind_address: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
@@ -22,6 +28,7 @@ impl ListenerBuilder {
             proxy_uri: None,
             jwt_signing_key_source: None,
             policies: Vec::new(),
+            influx_db_backend: None,
         }
     }
 
@@ -67,6 +74,13 @@ impl ListenerBuilder {
         self
     }
 
+    pub fn log_to_influx_db(mut self, uri: &String, database: &String) -> ListenerBuilder {
+        self.influx_db_backend = Some(influxdb::Backend {
+            config: influxdb::Config::new(uri.clone(), database.clone()),
+        });
+        self
+    }
+
     pub fn build(self) -> Listener {
         Listener {
             listener_address: SocketAddr::new(self.bind_address, self.port),
@@ -74,6 +88,7 @@ impl ListenerBuilder {
             api_uri: self.proxy_uri.unwrap(),
             jwt_signing_key_source: self.jwt_signing_key_source,
             pdp: crate::abac::PDP::with_policies(self.policies),
+            influx_db_backend: self.influx_db_backend,
         }
     }
 }

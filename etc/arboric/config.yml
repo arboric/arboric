@@ -14,3 +14,7 @@ listeners:
     from_env:
       key: SECRET_KEY_BASE
       encoding: hex
+  log_to:
+    influx_db:
+      uri: http://localhost:8086
+      database: arboric

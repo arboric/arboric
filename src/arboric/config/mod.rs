@@ -38,6 +38,39 @@ impl Configuration {
     }
 }
 
+/// An [Listener](arboric::config::Listener) defines:
+///
+/// * an inbound endpoint, comprising:
+///   * a 'bind' IP address
+///   * an optional 'path' or prefix, e.g. `"/graphql"`
+/// * a back-end API URL
+/// * an optional InfluxDB backend configuration
+/// * an `arboric::abac::PDP` or set of ABAC policies
+#[derive(Debug, Clone)]
+pub struct Listener {
+    pub listener_address: SocketAddr,
+    pub listener_path: Option<String>,
+    pub api_uri: Uri,
+    pub jwt_signing_key_source: Option<JwtSigningKeySource>,
+    pub pdp: crate::abac::PDP,
+    pub influx_db_backend: Option<super::influxdb::Backend>,
+}
+
+impl Listener {
+    /// Construct a [Listener](arboric::config::Listener) that binds to the given
+    /// [IpAddr](std::net::IpAddr), port, and forwards to the API at the given [Uri](hyper::Uri)
+    pub fn ip_addr_and_port(ip_addr: IpAddr, port: u16, api_uri: &Uri) -> Listener {
+        Listener {
+            listener_address: SocketAddr::new(ip_addr, port),
+            listener_path: None,
+            api_uri: api_uri.clone(),
+            jwt_signing_key_source: None,
+            pdp: PDP::default(),
+            influx_db_backend: None,
+        }
+    }
+}
+
 /// A [KeyEncoding](arboric::config::KeyEncoding) just tells us whether the value is encoded as
 /// hex or base64
 #[derive(Debug, Clone)]
@@ -121,36 +154,6 @@ impl JwtSigningKeySource {
                 "{:?} not yet implemented!",
                 x
             ))),
-        }
-    }
-}
-
-/// An [Listener](arboric::config::Listener) defines:
-///
-/// * an inbound endpoint, comprising:
-///   * a 'bind' IP address
-///   * an optional 'path' or prefix, e.g. `"/graphql"`
-/// * a back-end API URL
-/// * an `arboric::abac::PDP` or set of ABAC policies
-#[derive(Debug, Clone)]
-pub struct Listener {
-    pub listener_address: SocketAddr,
-    pub listener_path: Option<String>,
-    pub api_uri: Uri,
-    pub jwt_signing_key_source: Option<JwtSigningKeySource>,
-    pub pdp: crate::abac::PDP,
-}
-
-impl Listener {
-    /// Construct a [Listener](arboric::config::Listener) that binds to the given
-    /// [IpAddr](std::net::IpAddr), port, and forwards to the API at the given [Uri](hyper::Uri)
-    pub fn ip_addr_and_port(ip_addr: IpAddr, port: u16, api_uri: &Uri) -> Listener {
-        Listener {
-            listener_address: SocketAddr::new(ip_addr, port),
-            listener_path: None,
-            api_uri: api_uri.clone(),
-            jwt_signing_key_source: None,
-            pdp: PDP::default(),
         }
     }
 }

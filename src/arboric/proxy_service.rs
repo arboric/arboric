@@ -12,6 +12,8 @@ use log::{debug, error, trace, warn};
 use simple_error::bail;
 use std::error::Error;
 
+use super::influxdb;
+
 // Just a simple type alias
 type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
@@ -20,14 +22,21 @@ pub struct ProxyService {
     pub api_uri: http::Uri,
     pub secret_key_bytes: Option<Vec<u8>>,
     pub pdp: PDP,
+    pub influx_db_backend: Option<influxdb::Backend>,
 }
 
 impl ProxyService {
-    pub fn new(api_uri: &http::Uri, secret_key_bytes: &Option<Vec<u8>>, pdp: &PDP) -> ProxyService {
+    pub fn new(
+        api_uri: &http::Uri,
+        secret_key_bytes: &Option<Vec<u8>>,
+        pdp: &PDP,
+        influx_db_backend: &Option<influxdb::Backend>,
+    ) -> ProxyService {
         ProxyService {
             api_uri: api_uri.clone(),
             secret_key_bytes: secret_key_bytes.clone(),
             pdp: pdp.clone(),
+            influx_db_backend: influx_db_backend.clone(),
         }
     }
 
@@ -106,6 +115,8 @@ impl ProxyService {
         let content_type = Self::get_content_type_as_mime_type(&parts.headers);
         trace!("content_type => {:?}", &content_type);
 
+        let influx_db_backend = self.influx_db_backend.clone();
+
         // TODO: Figure out the proper lifetime annotations and stop
         // cloning everything
         let pdp = self.pdp.clone();
@@ -116,7 +127,10 @@ impl ProxyService {
             let body = String::from_utf8_lossy(&v).to_string();
             debug!("body => {:?}", &body);
             if let Ok(Some((document, counts))) = super::parse_post(content_type, &body) {
-                super::log_counts(&counts);
+                trace!("influx_db_backend => {:?}", &influx_db_backend);
+                if let Some(backend) = influx_db_backend {
+                    super::log_counts(&backend, &counts);
+                }
                 if auth {
                     let request = crate::Request {
                         claims: claims.unwrap(),

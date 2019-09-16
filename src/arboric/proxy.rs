@@ -28,6 +28,7 @@ impl NewService for Proxy {
             &self.listener.api_uri,
             &self.secret_key_bytes,
             &self.listener.pdp,
+            &self.listener.influx_db_backend,
         )))
     }
 }
