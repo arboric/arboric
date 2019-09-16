@@ -19,6 +19,10 @@
 //!     from_env:
 //!       key: SECRET_KEY_BASE
 //!       encoding: hex
+//!   log_to:
+//!     influx_db:
+//!       uri: https://localhost:8086
+//!       database: arboric
 //! ```
 
 use crate::Configuration;
@@ -46,6 +50,11 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
                 if listener_config.jwt_signing_key.from_env.encoding == "hex" {
                     listener =
                         listener.jwt_from_env_hex(&listener_config.jwt_signing_key.from_env.key);
+                }
+                if let Some(ref log_to) = listener_config.log_to {
+                    if let Some(ref influx_db) = log_to.influx_db {
+                        listener = listener.log_to_influx_db(&influx_db.uri, &influx_db.database);
+                    }
                 }
                 // TODO: Allow specifiying policies in YAML
                 let policy = crate::abac::Policy::allow_any();
@@ -91,6 +100,7 @@ pub struct Listener {
     pub port: u16,
     pub proxy: String,
     pub jwt_signing_key: JwtSigningKey,
+    pub log_to: Option<LogTo>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -102,6 +112,17 @@ pub struct JwtSigningKey {
 pub struct FromEnv {
     pub key: String,
     pub encoding: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct LogTo {
+    pub influx_db: Option<InfluxDbConfig>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct InfluxDbConfig {
+    pub uri: String,
+    pub database: String,
 }
 
 #[cfg(test)]
@@ -122,6 +143,10 @@ listeners:
     from_env:
       key: SECRET_KEY_BASE
       encoding: hex
+  log_to:
+    influx_db:
+      uri: http://localhost:8086
+      database: arboric
 ";
 
     #[test]

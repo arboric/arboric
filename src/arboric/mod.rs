@@ -53,7 +53,7 @@ pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> ParsePostR
 }
 
 pub fn log_counts(influx_db_backend: &influxdb::Backend, map: &QueryCounts) {
-    use influx_db_client::{Client, Point, Points, Precision, Value};
+    trace!("log_counts({:?}, {:?}", &influx_db_backend, &map);
     let total: usize = map.values().sum();
     info!(
         "Found {} ({} unique) fields/queries",
@@ -61,27 +61,7 @@ pub fn log_counts(influx_db_backend: &influxdb::Backend, map: &QueryCounts) {
         map.keys().count()
     );
 
-    let client = Client::new("http://localhost:8086", "arboric");
-
-    let mut points: Vec<Point> = Vec::new();
-    for (field, n) in map {
-        debug!("{}: {}", &field, &n);
-        let point = Point::new("queries")
-            .add_tag("field", Value::String(field.clone()))
-            .add_field("n", Value::Integer(*n as i64))
-            .to_owned();
-        points.push(point);
-    }
-
-    // if Precision is None, the default is second
-    // Multiple write
-    let _ = client
-        .write_points(
-            Points::create_new(points),
-            Some(Precision::Milliseconds),
-            None,
-        )
-        .unwrap();
+    influx_db_backend.write_points(map);
 }
 
 #[derive(Debug, Serialize, Deserialize)]

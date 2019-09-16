@@ -12,13 +12,13 @@ cargo run
 ```
 
 ```
-curl -w "\n" -X POST -H "Content-Type: application/graphql" --data "heroes.gql" http://localhost:4000
+curl -w "\n" -X POST -H "Content-Type: application/graphql" --data "@heroes.gql" http://localhost:4000
 ```
 
 Or
 
 ```
-curl -w "\n" -X POST -H "Content-Type: application/json" --data "heroes.json" http://localhost:4000
+curl -w "\n" -X POST -H "Content-Type: application/json" --data "@heroes.json" http://localhost:4000
 ```
 
 ### With JWT authentication
@@ -28,13 +28,13 @@ $ SECRET_KEY_BASE=fb9f0a56c2195aa7294f7b076d145bb1a701decd06e8e32cbfdc2f3146a11b
 ```
 
 ```
-curl -w "\n" -X POST -H "Content-Type: application/graphql" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo" --data "heroes.gql" http://localhost:4000
+curl -w "\n" -X POST -H "Content-Type: application/graphql" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo" --data "@heroes.gql" http://localhost:4000
 ```
 
 Or
 
 ```
-curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo" --data "heroes.json" http://localhost:4000
+curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo" --data "@heroes.json" http://localhost:4000
 ```
 
 ### Testing RBAC
@@ -42,7 +42,7 @@ curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bear
 Using a JWT with `"admin"` role:
 
 ```
-curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE" --data "admin_only.json" http://localhost:4000
+curl -w "\n" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE" --data "@admin_only.json" http://localhost:4000
 ```
 
 ## Benchmarking (using `ab`)
@@ -54,13 +54,13 @@ ab -p test/multi.json -T "application/json" -n 1000 -c 10 --data http://127.0.0.
 With JWT and `"admin"` role:
 
 ```
-ab -p test/admin_only.json -T "application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE" -n 1000 -c 10 --data http://127.0.0.1:4000/
+ab -p test/admin_only.json -T "application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE" -n 1000 -c 10  http://127.0.0.1:4000/
 ```
 
 ### As a Proxy (with Authentication)
 
 ```
-curl -w "\n" -x localhost:4000 -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo"  --data "heroes.json" http://localhost:3000/graphql
+curl -w "\n" -x localhost:4000 -X POST -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1NjAyMTk4MjUsImlzcyI6ImRlbW8uc2hvcmVzdWl0ZS5kZXYiLCJzdWIiOiIxNyJ9.AGHOUJKQ7cOX_buVVbbsIarYfU_C_pwOeoAlhVkNceo"  --data "@heroes.json" http://localhost:3000/graphql
 ```
 
 ## InfluxDB and Grafana
