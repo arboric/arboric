@@ -1,11 +1,7 @@
 arboric:
-  # 'global' config goes here
   log:
     console:
       level: info
-    file:
-      location: /var/log/arboric.log
-      level: debug
 listeners:
 - bind: localhost
   port: 4000
@@ -18,3 +14,11 @@ listeners:
     influx_db:
       uri: http://localhost:8086
       database: arboric
+  policies:
+  - when:
+    - claim_is_present: sub
+    allow:
+    - query: "*"
+    deny:
+    - query: "__*"
+    - mutation: "*"

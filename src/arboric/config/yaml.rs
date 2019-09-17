@@ -70,7 +70,6 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
 struct YamlConfig {
     arboric: Arboric,
     listeners: Option<Vec<Listener>>,
-    policies: Option<Policies>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -102,6 +101,7 @@ struct Listener {
     proxy: String,
     jwt_signing_key: JwtSigningKey,
     log_to: Option<LogTo>,
+    policies: Option<Vec<Policy>>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -127,13 +127,10 @@ struct InfluxDbConfig {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct Policies {
-    policies: Option<Vec<Policy>>,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Policy {
     when: Vec<When>,
+    #[serde(alias = "allow")]
+    allows: Option<Vec<Pattern>>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -156,6 +153,24 @@ struct ClaimEquals {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum Pattern {
+    Query(QueryDef),
+    Mutation(MutationDef),
+    SomeString(String),
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct QueryDef {
+    query: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct MutationDef {
+    mutation: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct ClaimIncludes {
     claim: String,
     includes: String,
@@ -167,8 +182,90 @@ mod test {
     use super::*;
 
     #[test]
+    fn test_yaml_config_policy_allow() {
+        let s = r#"---
+when:
+- claim_is_present: sub
+allow:
+- query: hero
+- mutation: createHero
+- "*"
+"#;
+        println!("{:?}", s);
+        let policy: Policy = serde_yaml::from_str(s).unwrap();
+        println!("{:?}", policy);
+        let allows = policy.allows.unwrap();
+        assert_eq!(
+            Pattern::Query(QueryDef {
+                query: String::from("hero")
+            }),
+            *allows.get(0).unwrap()
+        );
+        assert_eq!(
+            Pattern::Mutation(MutationDef {
+                mutation: String::from("createHero")
+            }),
+            *allows.get(1).unwrap()
+        );
+        assert_eq!(
+            Pattern::SomeString(String::from("*")),
+            *allows.get(2).unwrap()
+        );
+    }
+
+    #[test]
     fn test_yaml_config_policies() {
-        let s = "---
+        let s = r#"---
+- when:
+  - claim_is_present: sub
+  - claim: iss
+    equals: arboric.io
+  - claim: roles
+    includes: admin
+- when:
+  - claim_is_present: sub
+  allow:
+  - query: "*"
+"#;
+        println!("{:?}", s);
+        let policies: Vec<Policy> = serde_yaml::from_str(s).unwrap();
+        let first = policies.first().unwrap();
+        assert_eq!(
+            When::ClaimIsPresent(ClaimIsPresent {
+                claim_is_present: String::from("sub")
+            }),
+            *first.when.get(0).unwrap()
+        );
+        assert_eq!(
+            When::ClaimEquals(ClaimEquals {
+                claim: String::from("iss"),
+                equals: String::from("arboric.io")
+            }),
+            *first.when.get(1).unwrap()
+        );
+        assert_eq!(
+            When::ClaimIncludes(ClaimIncludes {
+                claim: String::from("roles"),
+                includes: String::from("admin")
+            }),
+            *first.when.get(2).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_yaml_config_listener() {
+        let s = r#"---
+bind: localhost
+port: 4000
+proxy: http://localhost:3001/graphql
+jwt_signing_key:
+  from_env:
+    key: SECRET_KEY_BASE
+    encoding: hex
+log_to:
+  influx_db:
+    uri: http://localhost:8086
+    database: arboric
 policies:
 - when:
   - claim_is_present: sub
@@ -176,9 +273,10 @@ policies:
     equals: arboric.io
   - claim: roles
     includes: admin
-";
-        println!("{:?}", s);
-        let doc: Policies = serde_yaml::from_str(s).unwrap();
+  allow:
+  - query: "*"
+"#;
+        let doc: Listener = serde_yaml::from_str(s).unwrap();
         println!("{:?}", doc);
         let policies = doc.policies.unwrap();
         let first = policies.first().unwrap();
@@ -204,7 +302,7 @@ policies:
         );
     }
 
-    static SAMPLE_CONFIG_YML: &str = "---
+    static YAML: &str = r#"---
 arboric:
   log:
     console:
@@ -221,12 +319,19 @@ listeners:
     influx_db:
       uri: http://localhost:8086
       database: arboric
-";
+  policies:
+  - when:
+    - claim_is_present: sub
+    - claim: iss
+      equals: arboric.io
+    allow:
+    - query: "*"
+"#;
 
     #[test]
-    fn test_yaml_config() {
-        println!("{:?}", SAMPLE_CONFIG_YML);
-        let yaml_config: YamlConfig = serde_yaml::from_str(SAMPLE_CONFIG_YML).unwrap();
+    fn test_yaml_config_from_string() {
+        println!("YAML: {:?}", &YAML);
+        let yaml_config: YamlConfig = serde_yaml::from_str(YAML).unwrap();
         assert!(yaml_config.arboric.log.console.is_some());
         assert_eq!("info", yaml_config.arboric.log.console.unwrap().level);
         assert!(yaml_config.arboric.log.file.is_none());
@@ -235,6 +340,26 @@ listeners:
         assert!(!listeners.is_empty());
         let first = listeners.first();
         println!("{:?}", first);
+    }
+
+    #[test]
+    fn test_yaml_config_from_file() {
+        let mut path = std::path::PathBuf::from(file!());
+        path.push("../../../../etc/arboric/config.yml");
+        let filename = path.canonicalize().unwrap();
+        println!(r#"filename: "{}""#, filename.to_str().unwrap());
+        let file = std::fs::File::open(filename.as_path()).unwrap();
+        let yaml_config: YamlConfig = serde_yaml::from_reader(file).unwrap();
+        assert!(yaml_config.arboric.log.console.is_some());
+        assert_eq!("info", yaml_config.arboric.log.console.unwrap().level);
+        assert!(yaml_config.arboric.log.file.is_none());
+        assert!(yaml_config.listeners.is_some());
+        let listeners = yaml_config.listeners.unwrap();
+        assert!(!listeners.is_empty());
+        let first = listeners.first().unwrap();
+        println!("{:?}", first);
+        assert_eq!("localhost", first.bind);
+        assert_eq!(4000, first.port);
     }
 
 }
