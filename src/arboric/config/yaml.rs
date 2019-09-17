@@ -67,68 +67,142 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct YamlConfig {
-    pub arboric: Arboric,
-    pub listeners: Option<Vec<Listener>>,
+struct YamlConfig {
+    arboric: Arboric,
+    listeners: Option<Vec<Listener>>,
+    policies: Option<Policies>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Arboric {
-    pub log: Log,
+struct Arboric {
+    log: Log,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Log {
-    pub console: Option<Console>,
-    pub file: Option<File>,
+struct Log {
+    console: Option<Console>,
+    file: Option<File>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Console {
-    pub level: String,
+struct Console {
+    level: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct File {
-    pub level: String,
-    pub location: String,
+struct File {
+    level: String,
+    location: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct Listener {
-    pub bind: String,
-    pub port: u16,
-    pub proxy: String,
-    pub jwt_signing_key: JwtSigningKey,
-    pub log_to: Option<LogTo>,
+struct Listener {
+    bind: String,
+    port: u16,
+    proxy: String,
+    jwt_signing_key: JwtSigningKey,
+    log_to: Option<LogTo>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct JwtSigningKey {
-    pub from_env: FromEnv,
+struct JwtSigningKey {
+    from_env: FromEnv,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct FromEnv {
-    pub key: String,
-    pub encoding: String,
+struct FromEnv {
+    key: String,
+    encoding: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct LogTo {
-    pub influx_db: Option<InfluxDbConfig>,
+struct LogTo {
+    influx_db: Option<InfluxDbConfig>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub struct InfluxDbConfig {
-    pub uri: String,
-    pub database: String,
+struct InfluxDbConfig {
+    uri: String,
+    database: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct Policies {
+    policies: Option<Vec<Policy>>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct Policy {
+    when: Vec<When>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+enum When {
+    ClaimIsPresent(ClaimIsPresent),
+    ClaimEquals(ClaimEquals),
+    ClaimIncludes(ClaimIncludes),
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct ClaimIsPresent {
+    claim_is_present: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct ClaimEquals {
+    claim: String,
+    equals: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct ClaimIncludes {
+    claim: String,
+    includes: String,
 }
 
 #[cfg(test)]
 mod test {
     // Import names from outer (for mod tests) scope.
     use super::*;
+
+    #[test]
+    fn test_yaml_config_policies() {
+        let s = "---
+policies:
+- when:
+  - claim_is_present: sub
+  - claim: iss
+    equals: arboric.io
+  - claim: roles
+    includes: admin
+";
+        println!("{:?}", s);
+        let doc: Policies = serde_yaml::from_str(s).unwrap();
+        println!("{:?}", doc);
+        let policies = doc.policies.unwrap();
+        let first = policies.first().unwrap();
+        assert_eq!(
+            When::ClaimIsPresent(ClaimIsPresent {
+                claim_is_present: String::from("sub")
+            }),
+            *first.when.get(0).unwrap()
+        );
+        assert_eq!(
+            When::ClaimEquals(ClaimEquals {
+                claim: String::from("iss"),
+                equals: String::from("arboric.io")
+            }),
+            *first.when.get(1).unwrap()
+        );
+        assert_eq!(
+            When::ClaimIncludes(ClaimIncludes {
+                claim: String::from("roles"),
+                includes: String::from("admin")
+            }),
+            *first.when.get(2).unwrap()
+        );
+    }
 
     static SAMPLE_CONFIG_YML: &str = "---
 arboric:
@@ -162,4 +236,5 @@ listeners:
         let first = listeners.first();
         println!("{:?}", first);
     }
+
 }
