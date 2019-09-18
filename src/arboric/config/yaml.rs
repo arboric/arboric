@@ -177,6 +177,29 @@ struct ClaimIncludes {
 }
 
 #[cfg(test)]
+impl When {
+    fn claim_is_present(claim: &str) -> Self {
+        When::ClaimIsPresent(ClaimIsPresent {
+            claim_is_present: String::from(claim),
+        })
+    }
+
+    fn claim_equals(claim: &str, equals: &str) -> Self {
+        When::ClaimEquals(ClaimEquals {
+            claim: String::from(claim),
+            equals: String::from(equals),
+        })
+    }
+
+    fn claim_includes(claim: &str, includes: &str) -> Self {
+        When::ClaimIncludes(ClaimIncludes {
+            claim: String::from(claim),
+            includes: String::from(includes),
+        })
+    }
+}
+
+#[cfg(test)]
 mod test {
     // Import names from outer (for mod tests) scope.
     use super::*;
@@ -230,24 +253,13 @@ allow:
         println!("{:?}", s);
         let policies: Vec<Policy> = serde_yaml::from_str(s).unwrap();
         let first = policies.first().unwrap();
+        assert_eq!(When::claim_is_present("sub"), *first.when.get(0).unwrap());
         assert_eq!(
-            When::ClaimIsPresent(ClaimIsPresent {
-                claim_is_present: String::from("sub")
-            }),
-            *first.when.get(0).unwrap()
-        );
-        assert_eq!(
-            When::ClaimEquals(ClaimEquals {
-                claim: String::from("iss"),
-                equals: String::from("arboric.io")
-            }),
+            When::claim_equals("iss", "arboric.io"),
             *first.when.get(1).unwrap()
         );
         assert_eq!(
-            When::ClaimIncludes(ClaimIncludes {
-                claim: String::from("roles"),
-                includes: String::from("admin")
-            }),
+            When::claim_includes("roles", "admin"),
             *first.when.get(2).unwrap()
         );
     }
@@ -280,24 +292,13 @@ policies:
         println!("{:?}", doc);
         let policies = doc.policies.unwrap();
         let first = policies.first().unwrap();
+        assert_eq!(When::claim_is_present("sub"), *first.when.get(0).unwrap());
         assert_eq!(
-            When::ClaimIsPresent(ClaimIsPresent {
-                claim_is_present: String::from("sub")
-            }),
-            *first.when.get(0).unwrap()
-        );
-        assert_eq!(
-            When::ClaimEquals(ClaimEquals {
-                claim: String::from("iss"),
-                equals: String::from("arboric.io")
-            }),
+            When::claim_equals("iss", "arboric.io"),
             *first.when.get(1).unwrap()
         );
         assert_eq!(
-            When::ClaimIncludes(ClaimIncludes {
-                claim: String::from("roles"),
-                includes: String::from("admin")
-            }),
+            When::claim_includes("roles", "admin"),
             *first.when.get(2).unwrap()
         );
     }
@@ -338,8 +339,20 @@ listeners:
         assert!(yaml_config.listeners.is_some());
         let listeners = yaml_config.listeners.unwrap();
         assert!(!listeners.is_empty());
-        let first = listeners.first();
-        println!("{:?}", first);
+        let listener = listeners.first().unwrap();
+        let policies = listener.policies.as_ref().unwrap();
+        println!("{:?}", policies);
+        let policy = policies.first().unwrap();
+        assert_eq!(
+            When::ClaimIsPresent(ClaimIsPresent {
+                claim_is_present: String::from("sub")
+            }),
+            *policy.when.get(0).unwrap()
+        );
+        assert_eq!(
+            When::claim_equals("iss", "arboric.io"),
+            *policy.when.get(1).unwrap()
+        );
     }
 
     #[test]
