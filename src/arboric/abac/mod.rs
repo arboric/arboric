@@ -21,11 +21,24 @@ pub struct Policy {
 }
 
 impl Policy {
-    pub fn allow_any() -> Policy {
+    /// Constructs an 'empty' Policy
+    pub fn new() -> Self {
+        Policy {
+            attributes: Vec::new(),
+            rules: Vec::new(),
+        }
+    }
+
+    /// Constructs a Policy that matches and allows any request
+    pub fn allow_any() -> Self {
         Policy {
             attributes: vec![MatchAttribute::Any],
             rules: vec![Rule::Allow(Pattern::Any)],
         }
+    }
+
+    pub fn add_match_attribute(&mut self, match_attribute: MatchAttribute) {
+        self.attributes.push(match_attribute);
     }
 
     pub fn allows(&self, request: &Request) -> bool {
@@ -80,25 +93,36 @@ pub enum MatchAttribute {
 
 impl MatchAttribute {
     // Creates a MatchAttribute::ClaimPresent
-    pub fn claim_present(claim: &str) -> MatchAttribute {
+    pub fn claim_present<S>(claim: S) -> MatchAttribute
+    where
+        S: Into<String>,
+    {
         MatchAttribute::ClaimPresent {
-            claim: claim.to_owned(),
+            claim: claim.into(),
         }
     }
 
     // Creates a MatchAttribute::ClaimEquals
-    pub fn claim_equals(claim: &str, value: &str) -> MatchAttribute {
+    pub fn claim_equals<S, V>(claim: S, value: V) -> MatchAttribute
+    where
+        S: Into<String>,
+        V: Into<String>,
+    {
         MatchAttribute::ClaimEquals {
-            claim: claim.to_owned(),
-            value: value.to_owned(),
+            claim: claim.into(),
+            value: value.into(),
         }
     }
 
     // Creates a MatchAttribute::ClaimIncludes
-    pub fn claim_includes(claim: &str, element: &str) -> MatchAttribute {
+    pub fn claim_includes<S, V>(claim: S, element: V) -> MatchAttribute
+    where
+        S: Into<String>,
+        V: Into<String>,
+    {
         MatchAttribute::ClaimIncludes {
-            claim: claim.to_owned(),
-            element: element.to_owned(),
+            claim: claim.into(),
+            element: element.into(),
         }
     }
 }
@@ -144,11 +168,17 @@ pub enum Rule {
 }
 
 impl Rule {
-    pub fn allow(s: &str) -> Rule {
+    pub fn allow<S>(s: S) -> Rule
+    where
+        S: Into<String> + PartialEq,
+    {
         Rule::Allow(Pattern::parse(s))
     }
 
-    pub fn deny(s: &str) -> Rule {
+    pub fn deny<S>(s: S) -> Rule
+    where
+        S: Into<String> + PartialEq,
+    {
         Rule::Deny(Pattern::parse(s))
     }
 

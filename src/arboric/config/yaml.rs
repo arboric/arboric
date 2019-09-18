@@ -25,12 +25,15 @@
 //!       database: arboric
 //! ```
 
+use crate::abac;
 use crate::Configuration;
 use http::Uri;
 use serde::{Deserialize, Serialize};
 
 /// Read the Configuration from the specified YAML file
 pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configuration> {
+    use abac::MatchAttribute;
+
     let f = std::fs::File::open(filename)?;
     let yaml_config: YamlConfig = serde_yaml::from_reader(f)?;
 
@@ -48,17 +51,45 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
                     .port(listener_config.port)
                     .proxy(listener_config.proxy.parse::<Uri>().unwrap());
                 if listener_config.jwt_signing_key.from_env.encoding == "hex" {
-                    listener =
-                        listener.jwt_from_env_hex(&listener_config.jwt_signing_key.from_env.key);
+                    listener.jwt_from_env_hex(&listener_config.jwt_signing_key.from_env.key);
                 }
                 if let Some(ref log_to) = listener_config.log_to {
                     if let Some(ref influx_db) = log_to.influx_db {
-                        listener = listener.log_to_influx_db(&influx_db.uri, &influx_db.database);
+                        listener.log_to_influx_db(&influx_db.uri, &influx_db.database);
                     }
                 }
-                // TODO: Allow specifiying policies in YAML
-                let policy = crate::abac::Policy::allow_any();
-                listener.add_policy(policy)
+                if let Some(policies) = listener_config.policies.as_ref() {
+                    for policy_def in policies.iter() {
+                        let mut policy = abac::Policy::new();
+                        for when in policy_def.when.iter() {
+                            let match_attribute: MatchAttribute = match when {
+                                When::ClaimIsPresent(w) => {
+                                    MatchAttribute::claim_present(&w.claim_is_present)
+                                }
+                                When::ClaimEquals(w) => {
+                                    MatchAttribute::claim_equals(&w.claim, &w.equals)
+                                }
+                                When::ClaimIncludes(w) => {
+                                    MatchAttribute::claim_includes(&w.claim, &w.includes)
+                                }
+                            };
+                            policy.add_match_attribute(match_attribute);
+                        }
+
+                        if let Some(ref allows) = policy_def.allows {
+                            for allow in allows.iter() {
+                                let pattern = match allow {
+                                    Pattern::Query(def) => format!("query:{}", &def.query),
+                                    Pattern::Mutation(def) => format!("mutation:{}", &def.mutation),
+                                    Pattern::SomeString(ref s) => String::from(s),
+                                };
+                                abac::Rule::allow(pattern);
+                            }
+                        }
+                        listener.add_policy(policy);
+                    }
+                }
+                listener
             })
         }
     }
