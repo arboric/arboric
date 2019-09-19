@@ -22,3 +22,8 @@ listeners:
     deny:
     - query: "__*"
     - mutation: "*"
+  - when:
+    - claim: roles
+      includes: admin
+    allow:
+    - "*"
