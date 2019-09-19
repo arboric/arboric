@@ -139,17 +139,20 @@ impl JwtSigningKeySource {
                     x
                 ))),
             },
-            JwtSigningKeySource::FromEnv { key, encoding } => {
-                let secret = env::var(key)?;
-                match encoding {
+            JwtSigningKeySource::FromEnv { key, encoding } => match env::var(key) {
+                Ok(secret) => match encoding {
                     KeyEncoding::Hex => Ok(hex::decode(&secret)?),
                     KeyEncoding::Base64 => Ok(base64::decode(&secret)?),
                     x => Err(crate::ArboricError::general(format!(
                         "Not yet implemented: {:?}!",
                         x
                     ))),
-                }
-            }
+                },
+                Err(e) => Err(crate::ArboricError::EnvVarError {
+                    message: key.into(),
+                    cause: e,
+                }),
+            },
             x => Err(crate::ArboricError::general(format!(
                 "{:?} not yet implemented!",
                 x

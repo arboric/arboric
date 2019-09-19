@@ -33,17 +33,20 @@ impl Pattern {
     /// assert_eq!(Pattern::parse("query:foo"), Pattern::query("foo"));
     /// assert_eq!(Pattern::parse("mutation:bar"), Pattern::mutation("bar"));
     /// ```
-    pub fn parse(pattern: &str) -> Pattern {
+    pub fn parse<S>(s: S) -> Pattern
+    where
+        S: Into<String> + PartialEq,
+    {
+        let pattern: String = s.into();
         if pattern == "*" {
             Pattern::Any
         } else {
-            let s = pattern.to_string();
-            if s.starts_with("mutation:") {
-                Pattern::mutation(&pattern[9..])
-            } else if s.starts_with("query:") {
-                Pattern::query(&pattern[6..])
+            if pattern.starts_with("mutation:") {
+                Pattern::mutation(&pattern.as_str()[9..])
+            } else if pattern.starts_with("query:") {
+                Pattern::query(&pattern.as_str()[6..])
             } else {
-                Pattern::query(&s)
+                Pattern::query(&pattern.as_str())
             }
         }
     }

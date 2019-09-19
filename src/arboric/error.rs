@@ -8,7 +8,7 @@ pub enum ArboricError {
     #[fail(display = "{}", message)]
     GeneralError { message: String },
 
-    #[fail(display = "{}", message)]
+    #[fail(display = "Unable to find or decode ENV['{}']", message)]
     EnvVarError {
         message: String,
         #[cause]
@@ -65,6 +65,20 @@ impl ArboricError {
         }
     }
 }
+
+// impl std::error::Error for ArboricError {
+//     fn description(&self) -> &str {
+//         match *self {
+//             ArboricError::GeneralError {message} => message.as_ref(),
+//             ArboricError::EnvVarError { message, cause } => message.as_ref(),
+//             ArboricError::HexDecodeError { message, cause } => message.as_ref(),
+//             ArboricError::Base64DecodeError { message, cause } => message.as_ref(),
+//             ArboricError::JsonError { message, cause } => message.as_ref(),
+//             ArboricError::YamlError { message, cause } => message.as_ref(),
+//             ArboricError::GraphqlParserError { message, cause } => message.as_ref(),
+//         }
+//     }
+// }
 
 // macro_rules! impl_from {
 //     ($($type:ty),+) => {
