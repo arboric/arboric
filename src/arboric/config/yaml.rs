@@ -26,8 +26,10 @@
 //! ```
 
 use crate::abac;
+use crate::arboric::graphql;
 use crate::Configuration;
 use http::Uri;
+use log::trace;
 use serde::{Deserialize, Serialize};
 
 /// Read the Configuration from the specified YAML file
@@ -76,14 +78,17 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
                             policy.add_match_attribute(match_attribute);
                         }
 
-                        if let Some(ref allows) = policy_def.allows {
-                            for allow in allows.iter() {
-                                let pattern = match allow {
-                                    Pattern::Query(def) => format!("query:{}", &def.query),
-                                    Pattern::Mutation(def) => format!("mutation:{}", &def.mutation),
-                                    Pattern::SomeString(ref s) => String::from(s),
-                                };
-                                abac::Rule::allow(pattern);
+                        if let Some(ref allows) = policy_def.allow {
+                            for pattern in allows.iter().map(&pattern_def_to_graphql_pattern) {
+                                trace!("allow: {:?}", pattern);
+                                policy.allow(pattern);
+                            }
+                        }
+
+                        if let Some(ref denies) = policy_def.deny {
+                            for pattern in denies.iter().map(&pattern_def_to_graphql_pattern) {
+                                trace!("deny: {:?}", pattern);
+                                policy.deny(pattern);
                             }
                         }
                         listener.add_policy(policy);
@@ -95,6 +100,14 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
     }
 
     Ok(config)
+}
+
+fn pattern_def_to_graphql_pattern(pattern: &Pattern) -> graphql::Pattern {
+    match pattern {
+        Pattern::Query(def) => graphql::Pattern::query(&def.query),
+        Pattern::Mutation(def) => graphql::Pattern::mutation(&def.mutation),
+        Pattern::SomeString(ref s) => graphql::Pattern::parse(s),
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -160,8 +173,8 @@ struct InfluxDbConfig {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Policy {
     when: Vec<When>,
-    #[serde(alias = "allow")]
-    allows: Option<Vec<Pattern>>,
+    allow: Option<Vec<Pattern>>,
+    deny: Option<Vec<Pattern>>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -248,22 +261,22 @@ allow:
         println!("{:?}", s);
         let policy: Policy = serde_yaml::from_str(s).unwrap();
         println!("{:?}", policy);
-        let allows = policy.allows.unwrap();
+        let allow = policy.allow.unwrap();
         assert_eq!(
             Pattern::Query(QueryDef {
                 query: String::from("hero")
             }),
-            *allows.get(0).unwrap()
+            *allow.get(0).unwrap()
         );
         assert_eq!(
             Pattern::Mutation(MutationDef {
                 mutation: String::from("createHero")
             }),
-            *allows.get(1).unwrap()
+            *allow.get(1).unwrap()
         );
         assert_eq!(
             Pattern::SomeString(String::from("*")),
-            *allows.get(2).unwrap()
+            *allow.get(2).unwrap()
         );
     }
 
@@ -319,9 +332,9 @@ policies:
   allow:
   - query: "*"
 "#;
-        let doc: Listener = serde_yaml::from_str(s).unwrap();
-        println!("{:?}", doc);
-        let policies = doc.policies.unwrap();
+        let listener: Listener = serde_yaml::from_str(s).unwrap();
+        println!("{:?}", listener);
+        let policies = listener.policies.unwrap();
         let first = policies.first().unwrap();
         assert_eq!(When::claim_is_present("sub"), *first.when.get(0).unwrap());
         assert_eq!(
@@ -332,6 +345,14 @@ policies:
             When::claim_includes("roles", "admin"),
             *first.when.get(2).unwrap()
         );
+        let allow = first.allow.as_ref().unwrap();
+        println!("{:?}", allow);
+        assert_eq!(
+            allow.get(0).unwrap(),
+            &Pattern::Query(QueryDef {
+                query: String::from("*")
+            })
+        )
     }
 
     static YAML: &str = r#"---
@@ -388,7 +409,9 @@ listeners:
 
     #[test]
     fn test_yaml_config_from_file() {
-        let mut path = std::path::PathBuf::from(file!());
+        let this_file = file!();
+        println!(r#"this_file: "{}""#, this_file);
+        let mut path = std::path::PathBuf::from(this_file);
         path.push("../../../../etc/arboric/config.yml");
         let filename = path.canonicalize().unwrap();
         println!(r#"filename: "{}""#, filename.to_str().unwrap());

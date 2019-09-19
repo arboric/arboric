@@ -41,6 +41,17 @@ impl Policy {
         self.attributes.push(match_attribute);
     }
 
+    pub fn allow(&mut self, pattern: Pattern) -> &mut Self {
+        self.rules.push(Rule::Allow(pattern));
+        self
+    }
+
+    pub fn deny(&mut self, pattern: Pattern) -> &mut Self {
+        self.rules.push(Rule::Deny(pattern));
+        self
+    }
+
+    /// Check to see if the Request is allowed
     pub fn allows(&self, request: &Request) -> bool {
         if self
             .attributes
