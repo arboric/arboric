@@ -409,10 +409,7 @@ listeners:
 
     #[test]
     fn test_yaml_config_from_file() {
-        let this_file = file!();
-        println!(r#"this_file: "{}""#, this_file);
-        let mut path = std::path::PathBuf::from(this_file);
-        path.push("../../../../etc/arboric/config.yml");
+        let path = std::path::PathBuf::from("etc/arboric/config.yml");
         let filename = path.canonicalize().unwrap();
         println!(r#"filename: "{}""#, filename.to_str().unwrap());
         let file = std::fs::File::open(filename.as_path()).unwrap();
