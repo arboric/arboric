@@ -37,24 +37,26 @@ impl Proxy {
     /// Constructs a new Proxy with the given backend API URI
     pub fn new(config: Configuration) -> Proxy {
         if let Some(listener) = config.listeners.first() {
-            let secret_key_bytes = Self::get_secret_key_bytes(&listener);
-            Proxy {
-                listener: (*listener).clone(),
-                secret_key_bytes: secret_key_bytes,
+            if let Some(key_source) = &listener.jwt_signing_key_source {
+                match key_source.get_secret_key_bytes() {
+                    Ok(secret_key_bytes) => {
+                        trace!("secret_key_bytes => {:?}", secret_key_bytes);
+                        Proxy {
+                            listener: (*listener).clone(),
+                            secret_key_bytes: Some(secret_key_bytes),
+                        }
+                    }
+                    Err(err) => panic!("Enable to get secret key bytes: {}!", err),
+                }
+            } else {
+                Proxy {
+                    listener: (*listener).clone(),
+                    secret_key_bytes: None,
+                }
             }
         } else {
             panic!("No listeners configured! See arboric::Configuration::listener()")
         }
-    }
-
-    fn get_secret_key_bytes(listener: &Listener) -> Option<Vec<u8>> {
-        if let Some(key_source) = &listener.jwt_signing_key_source {
-            if let Ok(vec) = key_source.get_secret_key_bytes() {
-                trace!("vec => {:?}", vec);
-                return Some(vec);
-            }
-        }
-        None
     }
 
     pub fn run(self) {
