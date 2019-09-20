@@ -27,6 +27,7 @@
 
 use crate::abac;
 use crate::arboric::graphql;
+use crate::arboric::ArboricError;
 use crate::Configuration;
 use http::Uri;
 use log::trace;
@@ -34,9 +35,24 @@ use serde::{Deserialize, Serialize};
 
 /// Read the Configuration from the specified YAML file
 pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configuration> {
+    use std::io::ErrorKind;
+
+    match std::fs::File::open(filename) {
+        Ok(f) => read_yaml_config(f),
+        Err(cause) => {
+            trace!("cause.kind() => {:?}", cause.kind());
+            let message = match cause.kind() {
+                ErrorKind::NotFound => format!("File not found: {}!", filename),
+                _ => cause.to_string(),
+            };
+            Err(ArboricError::IoError { message, cause })
+        }
+    }
+}
+
+fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
     use abac::MatchAttribute;
 
-    let f = std::fs::File::open(filename)?;
     let yaml_config: YamlConfig = serde_yaml::from_reader(f)?;
 
     let mut config = Configuration::new();
