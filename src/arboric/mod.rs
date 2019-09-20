@@ -14,13 +14,13 @@ pub mod graphql;
 pub mod influxdb;
 
 mod error;
-mod proxy;
+mod listener;
 mod proxy_service;
 
 // arboric::ArboricError;
 pub use error::ArboricError;
-// arboric::Proxy
-pub use proxy::Proxy;
+// arboric::Listener
+pub use listener::Listener;
 // arboric::ProxyService
 pub use proxy_service::ProxyService;
 

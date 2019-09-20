@@ -1,7 +1,7 @@
 //! An arboric::config::Builder allows for a fluent interface for
 //! building arboric::Configuration
 
-use super::{JwtSigningKeySource, Listener};
+use super::{JwtSigningKeySource, ListenerConfig};
 use crate::abac::Policy;
 use crate::arboric::influxdb;
 use hyper::Uri;
@@ -81,8 +81,8 @@ impl ListenerBuilder {
         self
     }
 
-    pub fn build(self) -> Listener {
-        Listener {
+    pub fn build(self) -> ListenerConfig {
+        ListenerConfig {
             listener_address: SocketAddr::new(self.bind_address, self.port),
             listener_path: None,
             api_uri: self.proxy_uri.unwrap(),

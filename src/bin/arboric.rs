@@ -41,8 +41,12 @@ fn main() -> Result<(), Error> {
 
 /// Run the Arboric proxy server according to the given configuration
 pub fn run(config: arboric::Configuration) {
-    let proxy = arboric::Proxy::new(config);
-    trace!("{:?}", proxy);
+    if let Some(listener_config) = config.listeners.first() {
+        let proxy = arboric::Listener::new(listener_config.clone());
+        trace!("{:?}", proxy);
 
-    proxy.run();
+        proxy.run();
+    } else {
+        panic!("No listeners configured! See arboric::Configuration::listener()")
+    }
 }
