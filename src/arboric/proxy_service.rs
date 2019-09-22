@@ -1,8 +1,8 @@
 //! Arboric ProxyService which does the actual work of the Proxy
 
 use crate::abac::PDP;
-use crate::Claims;
 use crate::arboric::listener::ListenerContext;
+use crate::Claims;
 use frank_jwt::{decode, Algorithm};
 use futures::future;
 use http::header::HeaderMap;
@@ -25,9 +25,9 @@ pub struct ProxyService {
 }
 
 impl ProxyService {
-    pub fn new(context: Arc<ListenerContext>) -> Self{
+    pub fn new(context: Arc<ListenerContext>) -> Self {
         ProxyService {
-            context: context.clone()
+            context: context.clone(),
         }
     }
 
