@@ -88,8 +88,6 @@ impl ProxyService {
         use futures::stream::Stream;
 
         trace!("do_post({:?}, {:?})", &self, &inbound);
-        let req_uri = inbound.uri();
-        debug!("req_uri => {}", req_uri);
 
         let uri: hyper::Uri = self.context.as_ref().api_uri.clone();
         debug!("uri => {}", uri);
