@@ -1,6 +1,5 @@
 //! Arboric ProxyService which does the actual work of the Proxy
 
-use crate::abac::PDP;
 use crate::arboric::listener::ListenerContext;
 use crate::Claims;
 use frank_jwt::{decode, Algorithm};
@@ -13,8 +12,6 @@ use log::{debug, error, trace, warn};
 use simple_error::bail;
 use std::error::Error;
 use std::sync::Arc;
-
-use super::influxdb;
 
 // Just a simple type alias
 type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
@@ -89,30 +86,32 @@ impl ProxyService {
 
         trace!("do_post({:?}, {:?})", &self, &inbound);
 
-        let uri: hyper::Uri = self.context.as_ref().api_uri.clone();
-        debug!("uri => {}", uri);
-
-        let auth = self.context.as_ref().secret_key_bytes.is_some();
-        if auth {
-            if claims.is_none() {
-                return halt(StatusCode::UNAUTHORIZED);
-            }
-        };
-
         let (parts, body) = inbound.into_parts();
         trace!("do_post({:?})", &body);
 
         let content_type = Self::get_content_type_as_mime_type(&parts.headers);
         trace!("content_type => {:?}", &content_type);
 
-        let influx_db_backend = self.context.as_ref().influx_db_backend.clone();
 
-        // TODO: Figure out the proper lifetime annotations and stop
-        // cloning everything
-        let pdp = self.context.as_ref().pdp.clone();
+        let context = self.context.clone();
+
+        let auth = context.as_ref().secret_key_bytes.is_some();
+        if auth {
+            if claims.is_none() {
+                return halt(StatusCode::UNAUTHORIZED);
+            }
+        };
 
         Box::new(body.concat2().from_err().and_then(move |chunk| {
-            trace!("chunk => {:?}", &chunk);
+
+            let uri = &context.as_ref().api_uri;
+            debug!("uri => {}", uri);
+
+            let influx_db_backend = &context.as_ref().influx_db_backend;
+
+            // TODO: Figure out the proper lifetime annotations and stop
+            // cloning everything
+            let pdp = &context.as_ref().pdp;
             let v = chunk.to_vec();
             let body = String::from_utf8_lossy(&v).to_string();
             debug!("body => {:?}", &body);
@@ -130,7 +129,7 @@ impl ProxyService {
                         return halt(StatusCode::UNAUTHORIZED);
                     }
                 }
-                let mut outbound = Request::post(&uri).body(Body::from(body)).unwrap();
+                let mut outbound = Request::post(uri).body(Body::from(body)).unwrap();
                 Self::copy_headers(&parts.headers, outbound.headers_mut());
 
                 let client = Client::new();
