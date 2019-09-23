@@ -75,7 +75,7 @@ impl ProxyService {
         Uri::builder()
             .scheme(scheme)
             .authority(authority.as_str())
-            .path_and_query(&pandq[..])
+            .path_and_query(pandq.as_str())
             .build()
             .unwrap()
     }
