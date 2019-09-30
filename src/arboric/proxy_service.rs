@@ -1,6 +1,6 @@
 //! Arboric ProxyService which does the actual work of the Proxy
 
-use crate::abac::PDP;
+use crate::arboric::listener::ListenerContext;
 use crate::Claims;
 use frank_jwt::{decode, Algorithm};
 use futures::future;
@@ -11,32 +11,20 @@ use hyper::{Body, Client, Method, Request, Response, StatusCode, Uri};
 use log::{debug, error, trace, warn};
 use simple_error::bail;
 use std::error::Error;
-
-use super::influxdb;
+use std::sync::Arc;
 
 // Just a simple type alias
 type BoxFut = Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
 #[derive(Debug)]
 pub struct ProxyService {
-    pub api_uri: http::Uri,
-    pub secret_key_bytes: Option<Vec<u8>>,
-    pub pdp: PDP,
-    pub influx_db_backend: Option<influxdb::Backend>,
+    context: Arc<ListenerContext>,
 }
 
 impl ProxyService {
-    pub fn new(
-        api_uri: &http::Uri,
-        secret_key_bytes: &Option<Vec<u8>>,
-        pdp: &PDP,
-        influx_db_backend: &Option<influxdb::Backend>,
-    ) -> ProxyService {
+    pub fn new(context: Arc<ListenerContext>) -> Self {
         ProxyService {
-            api_uri: api_uri.clone(),
-            secret_key_bytes: secret_key_bytes.clone(),
-            pdp: pdp.clone(),
-            influx_db_backend: influx_db_backend.clone(),
+            context: context.clone(),
         }
     }
 
@@ -76,14 +64,15 @@ impl ProxyService {
     }
 
     fn compute_get_uri(&self, req: &Request<Body>) -> Uri {
-        let authority = self.api_uri.authority_part().unwrap();
-        let scheme = self.api_uri.scheme_str().unwrap();
+        let api_uri = &self.context.as_ref().api_uri;
+        let authority = api_uri.authority_part().unwrap();
+        let scheme = api_uri.scheme_str().unwrap();
         let params = req.uri().query().unwrap();
         let pandq = format!("/graphql?{}", params);
         Uri::builder()
             .scheme(scheme)
             .authority(authority.as_str())
-            .path_and_query(&pandq[..])
+            .path_and_query(pandq.as_str())
             .build()
             .unwrap()
     }
@@ -96,18 +85,6 @@ impl ProxyService {
         use futures::stream::Stream;
 
         trace!("do_post({:?}, {:?})", &self, &inbound);
-        let req_uri = inbound.uri();
-        debug!("req_uri => {}", req_uri);
-
-        let uri: hyper::Uri = self.api_uri.clone();
-        debug!("uri => {}", uri);
-
-        let auth = self.secret_key_bytes.is_some();
-        if auth {
-            if claims.is_none() {
-                return halt(StatusCode::UNAUTHORIZED);
-            }
-        };
 
         let (parts, body) = inbound.into_parts();
         trace!("do_post({:?})", &body);
@@ -115,14 +92,26 @@ impl ProxyService {
         let content_type = Self::get_content_type_as_mime_type(&parts.headers);
         trace!("content_type => {:?}", &content_type);
 
-        let influx_db_backend = self.influx_db_backend.clone();
 
-        // TODO: Figure out the proper lifetime annotations and stop
-        // cloning everything
-        let pdp = self.pdp.clone();
+        let context = self.context.clone();
+
+        let auth = context.as_ref().secret_key_bytes.is_some();
+        if auth {
+            if claims.is_none() {
+                return halt(StatusCode::UNAUTHORIZED);
+            }
+        };
 
         Box::new(body.concat2().from_err().and_then(move |chunk| {
-            trace!("chunk => {:?}", &chunk);
+
+            let uri = &context.as_ref().api_uri;
+            debug!("uri => {}", uri);
+
+            let influx_db_backend = &context.as_ref().influx_db_backend;
+
+            // TODO: Figure out the proper lifetime annotations and stop
+            // cloning everything
+            let pdp = &context.as_ref().pdp;
             let v = chunk.to_vec();
             let body = String::from_utf8_lossy(&v).to_string();
             debug!("body => {:?}", &body);
@@ -140,7 +129,7 @@ impl ProxyService {
                         return halt(StatusCode::UNAUTHORIZED);
                     }
                 }
-                let mut outbound = Request::post(&uri).body(Body::from(body)).unwrap();
+                let mut outbound = Request::post(uri).body(Body::from(body)).unwrap();
                 Self::copy_headers(&parts.headers, outbound.headers_mut());
 
                 let client = Client::new();
@@ -219,7 +208,7 @@ impl Service for ProxyService {
         trace!("call({:?}, {:?})", &self, &req);
         trace!("req.method() => {:?}", &req.method());
         let claims: Option<Claims>;
-        if let Some(ref secret_key_bytes) = &self.secret_key_bytes {
+        if let Some(ref secret_key_bytes) = &self.context.as_ref().secret_key_bytes {
             if let Ok(map) = Self::get_authorization_token(&req, secret_key_bytes) {
                 trace!("{:?}", map);
                 claims = Some(map);

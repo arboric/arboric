@@ -9,7 +9,7 @@ mod arboric;
 pub use crate::arboric::abac;
 pub use crate::arboric::config;
 pub use crate::arboric::graphql;
-pub use crate::arboric::Proxy;
+pub use crate::arboric::Listener;
 
 pub use crate::arboric::ArboricError;
 pub use config::Configuration;
