@@ -3,10 +3,7 @@
 
 use crate::abac::PDP;
 use http::Uri;
-use log::trace;
 use std::env;
-use std::fs::File;
-use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 
 mod listener_builder;
@@ -164,21 +161,22 @@ impl JwtSigningKeySource {
                 }),
             },
             JwtSigningKeySource::FromFile { filename, encoding } => match encoding {
-                KeyEncoding::Bytes => read_bytes(&filename),
-                _ => Err(crate::ArboricError::general(format!(
-                    "Not yet implemented: Decoding hexadecimal or base64 files!",
-                ))),
+                KeyEncoding::Bytes => Ok(std::fs::read(filename)?),
+                KeyEncoding::Hex => read_file_as_hex(&filename),
+                KeyEncoding::Base64 => read_file_as_base64(&filename),
             },
         }
     }
 }
 
-fn read_bytes(filename: &String) -> crate::Result<Vec<u8>> {
-    let mut file = File::open(filename)?;
-    let mut bytes: Vec<u8> = Vec::new();
-    let n = file.read_to_end(&mut bytes)?;
-    trace!("Read {} bytes", &n);
-    Ok(bytes)
+fn read_file_as_hex(filename: &String) -> crate::Result<Vec<u8>> {
+    let s = std::fs::read_to_string(filename)?;
+    Ok(hex::decode(&s)?)
+}
+
+fn read_file_as_base64(filename: &String) -> crate::Result<Vec<u8>> {
+    let s = std::fs::read_to_string(filename)?;
+    Ok(base64::decode(&s)?)
 }
 
 #[cfg(test)]
