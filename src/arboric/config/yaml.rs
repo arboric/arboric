@@ -82,8 +82,17 @@ fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
                     },
                     JwtSigningKey::FromFile { ref from_file } => {
                         trace!("from_file => {:?}", &from_file);
+                        match &from_file.encoding {
+                            Some(encoding) => {
+                                panic!(r#"Unsupported encoding "{}" "#, encoding);
+                            }
+                            None => {
+                                listener.jwt_from_file(&from_file.name);
+                            }
+                        }
                     }
                 }
+
                 if let Some(ref log_to) = listener_config.log_to {
                     if let Some(ref influx_db) = log_to.influx_db {
                         listener.log_to_influx_db(&influx_db.uri, &influx_db.database);

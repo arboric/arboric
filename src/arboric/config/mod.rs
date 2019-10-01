@@ -3,7 +3,10 @@
 
 use crate::abac::PDP;
 use http::Uri;
+use log::trace;
 use std::env;
+use std::fs::File;
+use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 
 mod listener_builder;
@@ -117,15 +120,22 @@ impl JwtSigningKeySource {
 
     pub fn hex_from_env(key: String) -> JwtSigningKeySource {
         JwtSigningKeySource::FromEnv {
-            key: key,
+            key,
             encoding: KeyEncoding::Hex,
         }
     }
 
     pub fn base64_from_env(key: String) -> JwtSigningKeySource {
         JwtSigningKeySource::FromEnv {
-            key: key,
+            key,
             encoding: KeyEncoding::Base64,
+        }
+    }
+
+    pub fn from_file(filename: String) -> JwtSigningKeySource {
+        JwtSigningKeySource::FromFile {
+            filename,
+            encoding: KeyEncoding::Bytes,
         }
     }
 
@@ -153,12 +163,22 @@ impl JwtSigningKeySource {
                     cause: e,
                 }),
             },
-            x => Err(crate::ArboricError::general(format!(
-                "{:?} not yet implemented!",
-                x
-            ))),
+            JwtSigningKeySource::FromFile { filename, encoding } => match encoding {
+                KeyEncoding::Bytes => read_bytes(&filename),
+                _ => Err(crate::ArboricError::general(format!(
+                    "Not yet implemented: Decoding hexadecimal or base64 files!",
+                ))),
+            },
         }
     }
+}
+
+fn read_bytes(filename: &String) -> crate::Result<Vec<u8>> {
+    let mut file = File::open(filename)?;
+    let mut bytes: Vec<u8> = Vec::new();
+    let n = file.read_to_end(&mut bytes)?;
+    trace!("Read {} bytes", &n);
+    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -186,5 +206,4 @@ mod tests {
             configuration.listeners.first().unwrap().listener_address
         );
     }
-
 }
