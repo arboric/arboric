@@ -68,8 +68,21 @@ fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
                 listener = listener
                     .port(listener_config.port)
                     .proxy(listener_config.proxy.parse::<Uri>().unwrap());
-                if listener_config.jwt_signing_key.from_env.encoding == "hex" {
-                    listener.jwt_from_env_hex(&listener_config.jwt_signing_key.from_env.key);
+
+                match listener_config.jwt_signing_key {
+                    JwtSigningKey::FromEnv { ref from_env } => match &from_env.encoding {
+                        Some(encoding) => {
+                            if encoding == "hex" {
+                                listener.jwt_from_env_hex(&from_env.key);
+                            } else {
+                                panic!(r#"Unsupported encoding "{}" "#, encoding);
+                            }
+                        }
+                        None => (),
+                    },
+                    JwtSigningKey::FromFile { ref from_file } => {
+                        trace!("from_file => {:?}", &from_file);
+                    }
                 }
                 if let Some(ref log_to) = listener_config.log_to {
                     if let Some(ref influx_db) = log_to.influx_db {
@@ -79,19 +92,26 @@ fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
                 if let Some(policies) = listener_config.policies.as_ref() {
                     for policy_def in policies.iter() {
                         let mut policy = abac::Policy::new();
-                        for when in policy_def.when.iter() {
-                            let match_attribute: MatchAttribute = match when {
-                                When::ClaimIsPresent(w) => {
-                                    MatchAttribute::claim_present(&w.claim_is_present)
+                        match &policy_def.when {
+                            Some(ref vec) => {
+                                for when in vec.iter() {
+                                    let match_attribute: MatchAttribute = match when {
+                                        When::ClaimIsPresent(w) => {
+                                            MatchAttribute::claim_present(&w.claim_is_present)
+                                        }
+                                        When::ClaimEquals(w) => {
+                                            MatchAttribute::claim_equals(&w.claim, &w.equals)
+                                        }
+                                        When::ClaimIncludes(w) => {
+                                            MatchAttribute::claim_includes(&w.claim, &w.includes)
+                                        }
+                                    };
+                                    policy.add_match_attribute(match_attribute);
                                 }
-                                When::ClaimEquals(w) => {
-                                    MatchAttribute::claim_equals(&w.claim, &w.equals)
-                                }
-                                When::ClaimIncludes(w) => {
-                                    MatchAttribute::claim_includes(&w.claim, &w.includes)
-                                }
-                            };
-                            policy.add_match_attribute(match_attribute);
+                            }
+                            None => {
+                                policy.add_match_attribute(MatchAttribute::Any);
+                            }
                         }
 
                         if let Some(ref allows) = policy_def.allow {
@@ -165,14 +185,22 @@ struct Listener {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct JwtSigningKey {
-    from_env: FromEnv,
+#[serde(untagged)]
+enum JwtSigningKey {
+    FromEnv { from_env: FromEnv },
+    FromFile { from_file: FromFile },
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct FromEnv {
     key: String,
-    encoding: String,
+    encoding: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct FromFile {
+    name: String,
+    encoding: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -188,7 +216,7 @@ struct InfluxDbConfig {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Policy {
-    when: Vec<When>,
+    when: Option<Vec<When>>,
     allow: Option<Vec<Pattern>>,
     deny: Option<Vec<Pattern>>,
 }
@@ -313,14 +341,15 @@ allow:
         println!("{:?}", s);
         let policies: Vec<Policy> = serde_yaml::from_str(s).unwrap();
         let first = policies.first().unwrap();
-        assert_eq!(When::claim_is_present("sub"), *first.when.get(0).unwrap());
+        let when = &first.when.as_ref().unwrap();
+        assert_eq!(When::claim_is_present("sub"), *when.get(0).unwrap());
         assert_eq!(
             When::claim_equals("iss", "arboric.io"),
-            *first.when.get(1).unwrap()
+            *when.get(1).unwrap()
         );
         assert_eq!(
             When::claim_includes("roles", "admin"),
-            *first.when.get(2).unwrap()
+            *when.get(2).unwrap()
         );
     }
 
@@ -352,14 +381,15 @@ policies:
         println!("{:?}", listener);
         let policies = listener.policies.unwrap();
         let first = policies.first().unwrap();
-        assert_eq!(When::claim_is_present("sub"), *first.when.get(0).unwrap());
+        let when = &first.when.as_ref().unwrap();
+        assert_eq!(When::claim_is_present("sub"), *when.get(0).unwrap());
         assert_eq!(
             When::claim_equals("iss", "arboric.io"),
-            *first.when.get(1).unwrap()
+            *when.get(1).unwrap()
         );
         assert_eq!(
             When::claim_includes("roles", "admin"),
-            *first.when.get(2).unwrap()
+            *when.get(2).unwrap()
         );
         let allow = first.allow.as_ref().unwrap();
         println!("{:?}", allow);
@@ -411,16 +441,47 @@ listeners:
         let policies = listener.policies.as_ref().unwrap();
         println!("{:?}", policies);
         let policy = policies.first().unwrap();
-        assert_eq!(
-            When::ClaimIsPresent(ClaimIsPresent {
-                claim_is_present: String::from("sub")
-            }),
-            *policy.when.get(0).unwrap()
-        );
+        let when = &policy.when.as_ref().unwrap();
+        assert_eq!(When::claim_is_present("sub"), *when.get(0).unwrap());
         assert_eq!(
             When::claim_equals("iss", "arboric.io"),
-            *policy.when.get(1).unwrap()
+            *when.get(1).unwrap()
         );
+    }
+
+    static JWT_FROM_FILE_YAML: &str = r#"
+arboric:
+  log:
+    console:
+      level: info
+listeners:
+- bind: localhost
+  port: 4000
+  proxy: http://localhost:3001/graphql
+  jwt_signing_key:
+    from_file:
+      name: "etc/arboric/secret_key_bytes"
+  policies:
+  - allow:
+    - "*"
+"#;
+
+    #[test]
+    fn test_yaml_config_jwt_from_file() {
+        println!("JWT_FROM_FILE_YAML: {:?}", &JWT_FROM_FILE_YAML);
+        let yaml_config: YamlConfig = serde_yaml::from_str(JWT_FROM_FILE_YAML).unwrap();
+        let listeners = yaml_config.listeners.unwrap();
+        assert!(!listeners.is_empty());
+        let listener = listeners.first().unwrap();
+        assert_eq!(
+            listener.jwt_signing_key,
+            JwtSigningKey::FromFile {
+                from_file: FromFile {
+                    name: String::from("etc/arboric/secret_key_bytes"),
+                    encoding: None
+                }
+            }
+        )
     }
 
     #[test]
@@ -441,5 +502,4 @@ listeners:
         assert_eq!("localhost", first.bind);
         assert_eq!(4000, first.port);
     }
-
 }
