@@ -64,8 +64,15 @@ impl ListenerBuilder {
         self
     }
 
-    pub fn jwt_from_env_hex<S: Into<String>>(&mut self, jwt_env_key: S) -> &mut Self {
-        self.jwt_signing_key_source = Some(JwtSigningKeySource::hex_from_env(jwt_env_key.into()));
+    /// Configure this `Listener` with a hexadecimal JWT signing key from then environment
+    pub fn jwt_from_env_hex<S: Into<String>>(&mut self, key: S) -> &mut Self {
+        self.jwt_signing_key_source = Some(JwtSigningKeySource::hex_from_env(key.into()));
+        self
+    }
+
+    /// Configure this `Listener` with a JWT signing key from a file
+    pub fn jwt_from_file<S: Into<String>>(&mut self, filename: S) -> &mut Self {
+        self.jwt_signing_key_source = Some(JwtSigningKeySource::from_file(filename.into()));
         self
     }
 

@@ -117,15 +117,22 @@ impl JwtSigningKeySource {
 
     pub fn hex_from_env(key: String) -> JwtSigningKeySource {
         JwtSigningKeySource::FromEnv {
-            key: key,
+            key,
             encoding: KeyEncoding::Hex,
         }
     }
 
     pub fn base64_from_env(key: String) -> JwtSigningKeySource {
         JwtSigningKeySource::FromEnv {
-            key: key,
+            key,
             encoding: KeyEncoding::Base64,
+        }
+    }
+
+    pub fn from_file(filename: String) -> JwtSigningKeySource {
+        JwtSigningKeySource::FromFile {
+            filename,
+            encoding: KeyEncoding::Bytes,
         }
     }
 
@@ -153,12 +160,23 @@ impl JwtSigningKeySource {
                     cause: e,
                 }),
             },
-            x => Err(crate::ArboricError::general(format!(
-                "{:?} not yet implemented!",
-                x
-            ))),
+            JwtSigningKeySource::FromFile { filename, encoding } => match encoding {
+                KeyEncoding::Bytes => Ok(std::fs::read(filename)?),
+                KeyEncoding::Hex => read_file_as_hex(&filename),
+                KeyEncoding::Base64 => read_file_as_base64(&filename),
+            },
         }
     }
+}
+
+fn read_file_as_hex(filename: &String) -> crate::Result<Vec<u8>> {
+    let s = std::fs::read_to_string(filename)?;
+    Ok(hex::decode(&s)?)
+}
+
+fn read_file_as_base64(filename: &String) -> crate::Result<Vec<u8>> {
+    let s = std::fs::read_to_string(filename)?;
+    Ok(base64::decode(&s)?)
 }
 
 #[cfg(test)]
@@ -186,5 +204,4 @@ mod tests {
             configuration.listeners.first().unwrap().listener_address
         );
     }
-
 }

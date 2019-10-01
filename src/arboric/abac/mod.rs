@@ -417,5 +417,4 @@ mod tests {
             "mutation Createfoo {createfoo(name:\"Shazam!\") {foo{id}}}"
         )));
     }
-
 }

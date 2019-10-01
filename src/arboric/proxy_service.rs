@@ -92,7 +92,6 @@ impl ProxyService {
         let content_type = Self::get_content_type_as_mime_type(&parts.headers);
         trace!("content_type => {:?}", &content_type);
 
-
         let context = self.context.clone();
 
         let auth = context.as_ref().secret_key_bytes.is_some();
@@ -103,7 +102,6 @@ impl ProxyService {
         };
 
         Box::new(body.concat2().from_err().and_then(move |chunk| {
-
             let uri = &context.as_ref().api_uri;
             debug!("uri => {}", uri);
 
