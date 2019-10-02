@@ -1,0 +1,15 @@
+arboric:
+  log:
+    console:
+      level: info
+listeners:
+- bind: localhost
+  port: 4000
+  proxy: http://localhost:3001/graphql
+  jwt_signing_key:
+    from_env:
+      key: JWT_SIGNING_KEY
+      encoding: hex
+  policies:
+  - allow:
+    - "*"
