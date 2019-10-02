@@ -18,6 +18,8 @@ docker_build_develop:
       - Cargo.*
       - src/**/*
       - etc/**/*
+  services:
+    - docker:19.03.1-dind
   image: docker:18.09.1
   script:
     - docker build
@@ -38,6 +40,8 @@ docker_build_features:
       - Cargo.*
       - src/**/*
       - etc/**/*
+  services:
+    - docker:19.03.1-dind
   image: docker:18.09.1
   script:
     - docker build
