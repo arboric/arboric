@@ -3,9 +3,9 @@ arboric:
     console:
       level: info
 listeners:
-- bind: localhost
+- bind: 0.0.0.0
   port: 4000
-  proxy: http://localhost:3001/graphql
+  proxy: http://test_api/graphql
   jwt_signing_key:
     from_env:
       key: JWT_SIGNING_KEY

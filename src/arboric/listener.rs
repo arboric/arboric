@@ -55,11 +55,8 @@ impl Listener {
     }
 
     pub fn run(self) -> ! {
-        // This is our socket address...
-        let addr = ([127, 0, 0, 1], 4000).into();
-
-        let bound = Server::bind(&addr);
-        info!("Proxy listening on {}", &addr);
+        let bound = Server::bind(&self.context.listener_address);
+        info!("Proxy listening on {}", &self.context.listener_address);
         let server = bound
             .serve(self)
             .map_err(|e| eprintln!("server error: {}", e));

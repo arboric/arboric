@@ -28,12 +28,15 @@ FROM debian:buster-slim
 
 EXPOSE 4000
 
-RUN mkdir -p /etc/arboric
+RUN mkdir -p /etc/arboric && \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y openssl
 
-COPY ./etc/arboric/default-config.yml /etc/arboric/config.yml
+COPY ./etc/arboric/default-config.yml /var/arboric/config.yml
 
 WORKDIR /opt/app
 
 COPY --from=builder /usr/src/arboric/target/release/arboric .
 
-CMD ["/opt/app/arboric"]
+CMD trap 'exit' INT; /opt/app/arboric
