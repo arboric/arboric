@@ -1,4 +1,7 @@
-baseURL = "http://example.org/"
+baseURL = "https://arboric.gitlab.io/arboric/"
 languageCode = "en-us"
-title = "My New Hugo Site"
+title = "Arboric GraphQL API Gateway"
 theme = "hugo-lamp"
+
+[params]
+  logo = "/arboric.png"
