@@ -1,0 +1,7 @@
+baseURL = "https://arboric.gitlab.io/arboric/"
+languageCode = "en-us"
+title = "Arboric GraphQL API Gateway"
+theme = "hugo-lamp"
+
+[params]
+  logo = "/arboric.png"
