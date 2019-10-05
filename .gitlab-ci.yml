@@ -1,6 +1,7 @@
 stages:
   - test
   - build
+  - docs
 
 cargo_test:
   stage: test
@@ -75,3 +76,18 @@ docker_build_tags:
       .
     - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
     - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_TAG
+
+pages:
+  stage: docs
+  only:
+    changes:
+      - .gitlab-ci.yml
+      - docs/**/*
+  image: registry.gitlab.com/pages/hugo:latest
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+  script:
+    - hugo
+  artifacts:
+    paths:
+    - public
