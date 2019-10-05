@@ -6,6 +6,10 @@ stages:
 cargo_test:
   stage: test
   image: rust:1.37.0-stretch
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - target
   script:
     - cargo test
 
