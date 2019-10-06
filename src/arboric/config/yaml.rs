@@ -50,12 +50,45 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
     }
 }
 
+fn parse_level(s: &String) -> Option<log::Level> {
+    use log::Level;
+    use std::error::Error;
+    use std::str::FromStr;
+    match Level::from_str(s) {
+        Ok(level) => Some(level),
+        Err(err) => {
+            eprintln!(r#"Unrecognised log level "{}" ({})"#, s, err.description());
+            None
+        }
+    }
+}
+
 fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
-    use abac::MatchAttribute;
+    use crate::abac::MatchAttribute;
 
     let yaml_config: YamlConfig = serde_yaml::from_reader(f)?;
 
     let mut config = Configuration::new();
+    let ref mut loggers = config.arboric.loggers;
+
+    let arboric = yaml_config.arboric;
+    if let Some(console) = arboric.log.console {
+        if let Some(level) = parse_level(&console.level) {
+            let console_logger = crate::config::Logger::Console(level);
+            loggers.push(console_logger);
+        }
+    }
+
+    if let Some(file_logger_config) = arboric.log.file {
+        if let Some(level) = parse_level(&file_logger_config.level) {
+            let file_logger = crate::config::Logger::File {
+                location: file_logger_config.location,
+                level,
+            };
+            loggers.push(file_logger);
+        }
+    }
+
     if let Some(listeners) = yaml_config.listeners {
         for listener_config in listeners.iter() {
             config.listener(|mut listener| {
