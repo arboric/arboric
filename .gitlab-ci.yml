@@ -91,7 +91,7 @@ pages:
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
   script:
-    - cd docs && hugo -d ../
+    - cd docs && hugo -d ../public/
   artifacts:
     paths:
     - public
