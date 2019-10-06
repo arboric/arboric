@@ -30,8 +30,6 @@ pub type Result<T> = std::result::Result<T, ArboricError>;
 static ARBORIC: &str = "arboric";
 
 pub fn initialize_logging(configuration: &Configuration) {
-    println!("initialize_logging(...)");
-    println!("loggers: {}", configuration.arboric.loggers.iter().count());
     let loggers: Vec<Box<dyn simplelog::SharedLogger>> = configuration
         .arboric
         .loggers
@@ -73,17 +71,29 @@ fn init_file_logger(location: &String, level: &log::Level) -> Box<dyn simplelog:
     simplelog::WriteLogger::new(level.to_level_filter(), config, file)
 }
 
-// fn get_env_log_level_filter() -> Option<simplelog::LevelFilter> {
-//     if let Ok(val) = env::var("ARBORIC_LOG") {
-//         println!("ARBORIC_LOG => \"{}\"", &val);
-//         match val.to_lowercase().as_str() {
-//             "info" => Some(LevelFilter::Info),
-//             "trace" => Some(LevelFilter::Trace),
-//             "warn" => Some(LevelFilter::Warn),
-//             "debug" => Some(LevelFilter::Debug),
-//             _ => None,
-//         }
-//     } else {
-//         None
-//     }
-// }
+#[cfg(test)]
+pub fn initialize_test_logging() {
+    if let Some(level) = get_env_log_level() {
+        let config = make_config(&level);
+        let _ = SimpleLogger::new(level.to_level_filter(), config);
+    }
+}
+
+#[cfg(test)]
+fn get_env_log_level() -> Option<log::Level> {
+    use std::env;
+    use std::str::FromStr;
+
+    if let Ok(val) = env::var("ARBORIC_LOG") {
+        println!("ARBORIC_LOG => \"{}\"", &val);
+        match log::Level::from_str(val.to_lowercase().as_str()) {
+            Ok(level) => Some(level),
+            Err(_) => {
+                eprintln!(r#"Unrecognized ARBORIC_LOG value "{}""#, &val);
+                None
+            }
+        }
+    } else {
+        None
+    }
+}

@@ -1,7 +1,7 @@
 arboric:
   log:
     console:
-      level: trace
+      level: info
 listeners:
 - bind: localhost
   port: 4000
