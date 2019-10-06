@@ -4,4 +4,4 @@ title = "Arboric GraphQL API Gateway"
 theme = "hugo-lamp"
 
 [params]
-  logo = "/arboric.png"
+  logo = "arboric.png"
