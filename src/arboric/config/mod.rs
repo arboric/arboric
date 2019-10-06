@@ -14,6 +14,7 @@ pub mod yaml;
 /// The 'root' level configuration
 #[derive(Debug)]
 pub struct Configuration {
+    pub arboric: ArboricConfiguration,
     pub listeners: Vec<ListenerConfig>,
 }
 
@@ -21,6 +22,9 @@ impl Configuration {
     // Creates a new, empty [Configuration](arboric::config::Configuration)
     pub fn new() -> Configuration {
         Configuration {
+            arboric: ArboricConfiguration {
+                loggers: Vec::new(),
+            },
             listeners: Vec::new(),
         }
     }
@@ -36,6 +40,18 @@ impl Configuration {
     pub fn add_listener(&mut self, listener_config: ListenerConfig) {
         self.listeners.push(listener_config);
     }
+}
+
+#[derive(Debug)]
+pub struct ArboricConfiguration {
+    pub loggers: Vec<Logger>,
+}
+
+/// A Logger configuration. May be `Console` or `File`
+#[derive(Debug)]
+pub enum Logger {
+    Console(log::Level),
+    File { location: String, level: log::Level },
 }
 
 /// An [ListenerConfig](arboric::config::ListenerConfig) defines:

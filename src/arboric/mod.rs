@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_count_top_level_fields() {
-        crate::initialize_logging();
+        crate::initialize_test_logging();
         let mut expected: QueryCounts = HashMap::new();
         expected.insert("foo".into(), 1);
         let (_, counts) = count_top_level_fields("{foo{id}}").unwrap().unwrap();

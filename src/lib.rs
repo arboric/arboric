@@ -1,8 +1,8 @@
 //! The arboric library
 //!
 use serde_json::Map;
-use simplelog::{LevelFilter, SimpleLogger};
-use std::env;
+use simplelog::SimpleLogger;
+// use std::env;
 
 mod arboric;
 
@@ -27,26 +27,73 @@ pub struct Request {
 
 pub type Result<T> = std::result::Result<T, ArboricError>;
 
-pub fn initialize_logging() {
-    let mut config = simplelog::ConfigBuilder::new();
-    let level_filter = get_env_log_level_filter();
-    config.set_thread_level(level_filter);
-    config.add_filter_allow_str("arboric");
-    let _ = SimpleLogger::init(level_filter, config.build());
+static ARBORIC: &str = "arboric";
+
+pub fn initialize_logging(configuration: &Configuration) {
+    let loggers: Vec<Box<dyn simplelog::SharedLogger>> = configuration
+        .arboric
+        .loggers
+        .iter()
+        .map(|logger_conf| {
+            println!("logger_conf => {:?}", &logger_conf);
+            match logger_conf {
+                arboric::config::Logger::Console(level) => init_console_logger(&level),
+                arboric::config::Logger::File { location, level } => {
+                    init_file_logger(location, level)
+                }
+            }
+        })
+        .collect();
+    let _ = simplelog::CombinedLogger::init(loggers);
 }
 
-const DEBUG_LEVELFILTER: LevelFilter = LevelFilter::Debug;
+fn make_config(level: &log::Level) -> simplelog::Config {
+    let mut config = simplelog::ConfigBuilder::new();
+    config.set_thread_level(level.to_level_filter());
+    config.add_filter_allow_str(&ARBORIC);
+    config.build()
+}
 
-fn get_env_log_level_filter() -> simplelog::LevelFilter {
+fn init_console_logger(level: &log::Level) -> Box<dyn simplelog::SharedLogger> {
+    println!("init_console_logger({})", &level);
+    let config = make_config(&level);
+    SimpleLogger::new(level.to_level_filter(), config)
+}
+
+fn init_file_logger(location: &String, level: &log::Level) -> Box<dyn simplelog::SharedLogger> {
+    println!("init_file_logger({}, {})", &location, &level);
+    let config = make_config(&level);
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(location)
+        .unwrap_or_else(|_| panic!(r#"Unable to create log file "{}""#, &location));
+    simplelog::WriteLogger::new(level.to_level_filter(), config, file)
+}
+
+#[cfg(test)]
+pub fn initialize_test_logging() {
+    if let Some(level) = get_env_log_level() {
+        let config = make_config(&level);
+        let _ = SimpleLogger::new(level.to_level_filter(), config);
+    }
+}
+
+#[cfg(test)]
+fn get_env_log_level() -> Option<log::Level> {
+    use std::env;
+    use std::str::FromStr;
+
     if let Ok(val) = env::var("ARBORIC_LOG") {
         println!("ARBORIC_LOG => \"{}\"", &val);
-        match val.to_lowercase().as_str() {
-            "info" => LevelFilter::Info,
-            "trace" => LevelFilter::Trace,
-            "warn" => LevelFilter::Warn,
-            _ => DEBUG_LEVELFILTER,
+        match log::Level::from_str(val.to_lowercase().as_str()) {
+            Ok(level) => Some(level),
+            Err(_) => {
+                eprintln!(r#"Unrecognized ARBORIC_LOG value "{}""#, &val);
+                None
+            }
         }
     } else {
-        DEBUG_LEVELFILTER
+        None
     }
 }

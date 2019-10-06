@@ -318,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_abac_rule_matches() {
-        crate::initialize_logging();
+        crate::initialize_test_logging();
         let doc = graphql_parser::parse_query("{foo{bar}}").unwrap();
         let op = doc.definitions.first().unwrap();
         if let Operation(od) = op {
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn test_pdp_no_rules() {
-        crate::initialize_logging();
+        crate::initialize_test_logging();
         let pdp = PDP::new();
         let request = request(json!({"sub": "1"}), "{__schema{queryType{name}}}");
         assert!(!pdp.allows(&request));
@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn test_pdp_allow_any() {
-        crate::initialize_logging();
+        crate::initialize_test_logging();
         let pdp = PDP::default();
         let request = request(json!({}), "{__schema{queryType{name}}}");
         assert!(pdp.allows(&request));
@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn test_pdp_complex_example() {
-        crate::initialize_logging();
+        crate::initialize_test_logging();
         let user_policy = Policy {
             attributes: vec![MatchAttribute::claim_present("sub")],
             rules: vec![
