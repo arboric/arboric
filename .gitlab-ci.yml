@@ -65,6 +65,8 @@ docker_build_features:
 
 docker_build_tags:
   <<: *docker
+  only:
+    - tags
   script:
     - docker build
       -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
