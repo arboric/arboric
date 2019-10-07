@@ -5,7 +5,7 @@ stages:
 
 cargo_test:
   stage: test
-  image: rust:1.38.0-slim-buster
+  image: rust:1.38.0
   cache:
     key: ${CI_COMMIT_REF_SLUG}
     paths:
