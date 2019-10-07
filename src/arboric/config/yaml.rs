@@ -335,6 +335,22 @@ mod test {
     use super::*;
 
     #[test]
+    fn test_yaml_config_arboric() {
+        let s = r#"---
+arboric:
+  log:
+    console:
+      level: debug
+    file:
+      location: "./arboric.log"
+      level: trace
+"#;
+        let yaml_config: YamlConfig = serde_yaml::from_str(s).unwrap();
+        let arboric = yaml_config.arboric;
+        let log = arboric.log;
+    }
+
+    #[test]
     fn test_yaml_config_policy_allow() {
         let s = r#"---
 when:
@@ -344,9 +360,7 @@ allow:
 - mutation: createHero
 - "*"
 "#;
-        println!("{:?}", s);
         let policy: Policy = serde_yaml::from_str(s).unwrap();
-        println!("{:?}", policy);
         let allow = policy.allow.unwrap();
         assert_eq!(
             Pattern::Query(QueryDef {
@@ -380,7 +394,6 @@ allow:
   allow:
   - query: "*"
 "#;
-        println!("{:?}", s);
         let policies: Vec<Policy> = serde_yaml::from_str(s).unwrap();
         let first = policies.first().unwrap();
         let when = &first.when.as_ref().unwrap();
@@ -420,7 +433,6 @@ policies:
   - query: "*"
 "#;
         let listener: Listener = serde_yaml::from_str(s).unwrap();
-        println!("{:?}", listener);
         let policies = listener.policies.unwrap();
         let first = policies.first().unwrap();
         let when = &first.when.as_ref().unwrap();
@@ -434,7 +446,6 @@ policies:
             *when.get(2).unwrap()
         );
         let allow = first.allow.as_ref().unwrap();
-        println!("{:?}", allow);
         assert_eq!(
             allow.get(0).unwrap(),
             &Pattern::Query(QueryDef {
@@ -471,7 +482,6 @@ listeners:
 
     #[test]
     fn test_yaml_config_from_string() {
-        println!("YAML: {:?}", &YAML);
         let yaml_config: YamlConfig = serde_yaml::from_str(YAML).unwrap();
         assert!(yaml_config.arboric.log.console.is_some());
         assert_eq!("info", yaml_config.arboric.log.console.unwrap().level);
@@ -481,7 +491,6 @@ listeners:
         assert!(!listeners.is_empty());
         let listener = listeners.first().unwrap();
         let policies = listener.policies.as_ref().unwrap();
-        println!("{:?}", policies);
         let policy = policies.first().unwrap();
         let when = &policy.when.as_ref().unwrap();
         assert_eq!(When::claim_is_present("sub"), *when.get(0).unwrap());
@@ -510,7 +519,6 @@ listeners:
 
     #[test]
     fn test_yaml_config_jwt_from_file() {
-        println!("JWT_FROM_FILE_YAML: {:?}", &JWT_FROM_FILE_YAML);
         let yaml_config: YamlConfig = serde_yaml::from_str(JWT_FROM_FILE_YAML).unwrap();
         let listeners = yaml_config.listeners.unwrap();
         assert!(!listeners.is_empty());
@@ -530,7 +538,6 @@ listeners:
     fn test_yaml_config_from_file() {
         let path = std::path::PathBuf::from("etc/arboric/config.yml");
         let filename = path.canonicalize().unwrap();
-        println!(r#"filename: "{}""#, filename.to_str().unwrap());
         let file = std::fs::File::open(filename.as_path()).unwrap();
         let yaml_config: YamlConfig = serde_yaml::from_reader(file).unwrap();
         assert!(yaml_config.arboric.log.console.is_some());
@@ -540,7 +547,6 @@ listeners:
         let listeners = yaml_config.listeners.unwrap();
         assert!(!listeners.is_empty());
         let first = listeners.first().unwrap();
-        println!("{:?}", first);
         assert_eq!("localhost", first.bind);
         assert_eq!(4000, first.port);
     }
