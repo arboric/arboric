@@ -50,19 +50,6 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
     }
 }
 
-fn parse_level(s: &String) -> Option<log::Level> {
-    use log::Level;
-    use std::error::Error;
-    use std::str::FromStr;
-    match Level::from_str(s) {
-        Ok(level) => Some(level),
-        Err(err) => {
-            eprintln!(r#"Unrecognised log level "{}" ({})"#, s, err.description());
-            None
-        }
-    }
-}
-
 fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
     use crate::abac::MatchAttribute;
 
@@ -73,20 +60,16 @@ fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
 
     let arboric = yaml_config.arboric;
     if let Some(console) = arboric.log.console {
-        if let Some(level) = parse_level(&console.level) {
-            let console_logger = crate::config::Logger::Console(level);
-            loggers.push(console_logger);
-        }
+        let console_logger = crate::config::Logger::Console(console.level);
+        loggers.push(console_logger);
     }
 
     if let Some(file_logger_config) = arboric.log.file {
-        if let Some(level) = parse_level(&file_logger_config.level) {
-            let file_logger = crate::config::Logger::File {
-                location: file_logger_config.location,
-                level,
-            };
-            loggers.push(file_logger);
-        }
+        let file_logger = crate::config::Logger::File {
+            location: file_logger_config.location,
+            level: file_logger_config.level,
+        };
+        loggers.push(file_logger);
     }
 
     if let Some(listeners) = yaml_config.listeners {
@@ -207,12 +190,12 @@ struct Log {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Console {
-    level: String,
+    level: log::Level,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct File {
-    level: String,
+    level: log::Level,
     location: String,
 }
 
@@ -351,11 +334,11 @@ arboric:
         assert_eq!(
             Log {
                 console: Some(Console {
-                    level: String::from("debug")
+                    level: log::Level::Debug
                 }),
                 file: Some(File {
                     location: String::from("./arboric.log"),
-                    level: String::from("trace"),
+                    level: log::Level::Trace,
                 })
             },
             log
@@ -496,7 +479,10 @@ listeners:
     fn test_yaml_config_from_string() {
         let yaml_config: YamlConfig = serde_yaml::from_str(YAML).unwrap();
         assert!(yaml_config.arboric.log.console.is_some());
-        assert_eq!("info", yaml_config.arboric.log.console.unwrap().level);
+        assert_eq!(
+            log::Level::Info,
+            yaml_config.arboric.log.console.unwrap().level
+        );
         assert!(yaml_config.arboric.log.file.is_none());
         assert!(yaml_config.listeners.is_some());
         let listeners = yaml_config.listeners.unwrap();
@@ -553,7 +539,10 @@ listeners:
         let file = std::fs::File::open(filename.as_path()).unwrap();
         let yaml_config: YamlConfig = serde_yaml::from_reader(file).unwrap();
         assert!(yaml_config.arboric.log.console.is_some());
-        assert_eq!("info", yaml_config.arboric.log.console.unwrap().level);
+        assert_eq!(
+            log::Level::Info,
+            yaml_config.arboric.log.console.unwrap().level
+        );
         assert!(yaml_config.arboric.log.file.is_none());
         assert!(yaml_config.listeners.is_some());
         let listeners = yaml_config.listeners.unwrap();
