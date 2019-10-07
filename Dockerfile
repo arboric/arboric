@@ -28,10 +28,12 @@ FROM debian:buster-slim
 
 EXPOSE 4000
 
-RUN mkdir -p /etc/arboric && \
-    apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y openssl
+# apt-get update && apt-get install -y libssl1.1 results in 16MB additional bloat
+COPY ./etc/libssl1.1_1.1.1d-0+deb10u1_amd64.deb /tmp/
+
+RUN dpkg -i /tmp/libssl1.1_1.1.1d-0+deb10u1_amd64.deb && \
+    rm /tmp/libssl1.1_1.1.1d-0+deb10u1_amd64.deb && \
+    mkdir -p /etc/arboric
 
 COPY ./etc/arboric/default-config.yml /var/arboric/config.yml
 
