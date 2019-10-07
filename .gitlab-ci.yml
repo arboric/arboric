@@ -5,7 +5,7 @@ stages:
 
 cargo_test:
   stage: test
-  image: rust:1.37.0-stretch
+  image: rust:1.38.0-slim-buster
   cache:
     key: ${CI_COMMIT_REF_SLUG}
     paths:
@@ -13,11 +13,12 @@ cargo_test:
   script:
     - cargo test
 
-docker_build_develop:
+# Base docker job:
+#
+# * docker:19.03.1
+.docker: &docker
   stage: build
   only:
-    refs:
-      - develop
     changes:
       - .gitlab-ci.yml
       - Cargo.*
@@ -28,6 +29,12 @@ docker_build_develop:
   image: docker:18.09.1
   before_script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+
+docker_build_develop:
+  <<: *docker
+  only:
+    refs:
+      - develop
   script:
     - docker build
       -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
@@ -37,21 +44,11 @@ docker_build_develop:
     - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
 
 docker_build_features:
-  stage: build
+  <<: *docker
   when: manual
   only:
     refs:
       - /^feature\/.*$/
-    changes:
-      - .gitlab-ci.yml
-      - Cargo.*
-      - src/**/*
-      - etc/**/*
-  services:
-    - docker:19.03.1-dind
-  image: docker:18.09.1
-  before_script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
   script:
     - echo docker build
       -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
@@ -67,12 +64,7 @@ docker_build_features:
     - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
 
 docker_build_tags:
-  stage: build
-  only:
-    - tags
-  image: docker:18.09.1
-  before_script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+  <<: *docker
   script:
     - docker build
       -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
