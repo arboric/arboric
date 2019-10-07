@@ -1,7 +1,7 @@
 Arboric GraphQL API Gateway
 ====
 
-**Current version:** 0.2 Alpha
+**Current version:** 0.2.1 Alpha
 
 Arboric is the first, and so far only API proxy / gateway dedicated specifically for GraphQL. It aims to provide several key features:
 
@@ -128,13 +128,6 @@ Given the above configuration file, this will start Arboric listening on port 40
 
 ## Roadmap
 
-### 0.2.1 Alpha 1
-
-* [ ] Configurable log level
-* [ ] File logger
-* [ ] Configurable policies
-* [ ] Configurable InfluxDB logging
-
 ### 0.3 Beta
 
 * [ ] Allow for multiple Listeners
@@ -142,6 +135,13 @@ Given the above configuration file, this will start Arboric listening on port 40
 * [ ] Allow for run-time configuration (via the API)
 
 ## Versions
+
+### 0.2.1 Alpha 1 (2019-10-07)
+
+* Configurable log level
+* File logger
+* Configurable policies
+* Configurable InfluxDB logging
 
 ### 0.2 Alpha (2019-09-12)
 
