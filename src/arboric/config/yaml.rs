@@ -348,6 +348,18 @@ arboric:
         let yaml_config: YamlConfig = serde_yaml::from_str(s).unwrap();
         let arboric = yaml_config.arboric;
         let log = arboric.log;
+        assert_eq!(
+            Log {
+                console: Some(Console {
+                    level: String::from("debug")
+                }),
+                file: Some(File {
+                    location: String::from("./arboric.log"),
+                    level: String::from("trace"),
+                })
+            },
+            log
+        );
     }
 
     #[test]
