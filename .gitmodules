@@ -1,0 +1,3 @@
+[submodule "docs/themes/hugo-lamp"]
+	path = docs/themes/hugo-lamp
+	url = https://github.com/huyb1991/hugo-lamp

@@ -1,8 +1,97 @@
 stages:
   - test
+  - build
+  - docs
 
 cargo_test:
   stage: test
   image: rust:1.37.0-stretch
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - target
   script:
     - cargo test
+
+docker_build_develop:
+  stage: build
+  only:
+    refs:
+      - develop
+    changes:
+      - .gitlab-ci.yml
+      - Cargo.*
+      - src/**/*
+      - etc/**/*
+  services:
+    - docker:19.03.1-dind
+  image: docker:18.09.1
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+  script:
+    - docker build
+      -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+      -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
+      .
+    - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+    - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
+
+docker_build_features:
+  stage: build
+  when: manual
+  only:
+    refs:
+      - /^feature\/.*$/
+    changes:
+      - .gitlab-ci.yml
+      - Cargo.*
+      - src/**/*
+      - etc/**/*
+  services:
+    - docker:19.03.1-dind
+  image: docker:18.09.1
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+  script:
+    - echo docker build
+      -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+      -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
+      .
+    - docker build
+      -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+      -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
+      .
+    - echo docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+    - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+    - echo docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
+    - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_SHORT_SHA
+
+docker_build_tags:
+  stage: build
+  only:
+    - tags
+  image: docker:18.09.1
+  before_script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.com
+  script:
+    - docker build
+      -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+      -t registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_TAG
+      .
+    - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:latest
+    - docker push registry.gitlab.com/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME:$CI_COMMIT_TAG
+
+pages:
+  stage: docs
+  only:
+    changes:
+      - .gitlab-ci.yml
+      - docs/**/*
+  image: registry.gitlab.com/pages/hugo:latest
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+  script:
+    - cd docs && hugo -d ../public/
+  artifacts:
+    paths:
+    - public

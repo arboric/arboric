@@ -19,7 +19,8 @@ fn main() -> Result<(), Error> {
                 .short("f")
                 .long("config")
                 .value_name("FILE")
-                .help("Specify the configuration file to use (currently supports only YAML)")
+                .help("Specify the configuration file to use")
+                .default_value("/var/arboric/config.yml")
                 .takes_value(true),
         )
         .subcommand(SubCommand::with_name("start").about("start the arboric server"))
@@ -28,10 +29,7 @@ fn main() -> Result<(), Error> {
     let config_file = matches
         .value_of("config")
         .unwrap_or("/var/arboric/config.yml");
-    debug!("Loading configuration from: {}", config_file);
-
-    // TODO: Move to arboric::Configuration
-    arboric::initialize_logging();
+    debug!(r#"Loading configuration from: "{}""#, config_file);
 
     let config = arboric::config::yaml::read_yaml_configuration(config_file)?;
 
@@ -41,8 +39,14 @@ fn main() -> Result<(), Error> {
 
 /// Run the Arboric proxy server according to the given configuration
 pub fn run(config: arboric::Configuration) {
-    let proxy = arboric::Proxy::new(config);
-    trace!("{:?}", proxy);
+    arboric::initialize_logging(&config);
 
-    proxy.run();
+    if let Some(listener_config) = config.listeners.first() {
+        let proxy = arboric::Listener::new(listener_config.clone());
+        trace!("{:?}", proxy);
+
+        proxy.run();
+    } else {
+        panic!("No listeners configured! See arboric::Configuration::listener()")
+    }
 }

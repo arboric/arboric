@@ -14,13 +14,13 @@ pub mod graphql;
 pub mod influxdb;
 
 mod error;
-mod proxy;
+mod listener;
 mod proxy_service;
 
 // arboric::ArboricError;
 pub use error::ArboricError;
-// arboric::Proxy
-pub use proxy::Proxy;
+// arboric::Listener
+pub use listener::Listener;
 // arboric::ProxyService
 pub use proxy_service::ProxyService;
 
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_count_top_level_fields() {
-        crate::initialize_logging();
+        crate::initialize_test_logging();
         let mut expected: QueryCounts = HashMap::new();
         expected.insert("foo".into(), 1);
         let (_, counts) = count_top_level_fields("{foo{id}}").unwrap().unwrap();

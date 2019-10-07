@@ -1,0 +1,7 @@
+.gitignore
+.gitlab-ci.yml
+LICENSE
+README.md
+docker-compose.yml
+target/
+test/

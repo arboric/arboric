@@ -2,7 +2,7 @@
 //! for Arboric's configuration model
 
 use crate::abac::PDP;
-use hyper::Uri;
+use http::Uri;
 use std::env;
 use std::net::{IpAddr, SocketAddr};
 
@@ -14,13 +14,17 @@ pub mod yaml;
 /// The 'root' level configuration
 #[derive(Debug)]
 pub struct Configuration {
-    pub listeners: Vec<Listener>,
+    pub arboric: ArboricConfiguration,
+    pub listeners: Vec<ListenerConfig>,
 }
 
 impl Configuration {
     // Creates a new, empty [Configuration](arboric::config::Configuration)
     pub fn new() -> Configuration {
         Configuration {
+            arboric: ArboricConfiguration {
+                loggers: Vec::new(),
+            },
             listeners: Vec::new(),
         }
     }
@@ -33,12 +37,24 @@ impl Configuration {
         self.listeners.push(listener_builder.build());
     }
 
-    pub fn add_listener(&mut self, listener: Listener) {
-        self.listeners.push(listener);
+    pub fn add_listener(&mut self, listener_config: ListenerConfig) {
+        self.listeners.push(listener_config);
     }
 }
 
-/// An [Listener](arboric::config::Listener) defines:
+#[derive(Debug)]
+pub struct ArboricConfiguration {
+    pub loggers: Vec<Logger>,
+}
+
+/// A Logger configuration. May be `Console` or `File`
+#[derive(Debug)]
+pub enum Logger {
+    Console(log::Level),
+    File { location: String, level: log::Level },
+}
+
+/// An [ListenerConfig](arboric::config::ListenerConfig) defines:
 ///
 /// * an inbound endpoint, comprising:
 ///   * a 'bind' IP address
@@ -47,7 +63,7 @@ impl Configuration {
 /// * an optional InfluxDB backend configuration
 /// * an `arboric::abac::PDP` or set of ABAC policies
 #[derive(Debug, Clone)]
-pub struct Listener {
+pub struct ListenerConfig {
     pub listener_address: SocketAddr,
     pub listener_path: Option<String>,
     pub api_uri: Uri,
@@ -56,11 +72,11 @@ pub struct Listener {
     pub influx_db_backend: Option<super::influxdb::Backend>,
 }
 
-impl Listener {
+impl ListenerConfig {
     /// Construct a [Listener](arboric::config::Listener) that binds to the given
     /// [IpAddr](std::net::IpAddr), port, and forwards to the API at the given [Uri](hyper::Uri)
-    pub fn ip_addr_and_port(ip_addr: IpAddr, port: u16, api_uri: &Uri) -> Listener {
-        Listener {
+    pub fn ip_addr_and_port(ip_addr: IpAddr, port: u16, api_uri: &Uri) -> Self {
+        ListenerConfig {
             listener_address: SocketAddr::new(ip_addr, port),
             listener_path: None,
             api_uri: api_uri.clone(),
@@ -117,15 +133,22 @@ impl JwtSigningKeySource {
 
     pub fn hex_from_env(key: String) -> JwtSigningKeySource {
         JwtSigningKeySource::FromEnv {
-            key: key,
+            key,
             encoding: KeyEncoding::Hex,
         }
     }
 
     pub fn base64_from_env(key: String) -> JwtSigningKeySource {
         JwtSigningKeySource::FromEnv {
-            key: key,
+            key,
             encoding: KeyEncoding::Base64,
+        }
+    }
+
+    pub fn from_file(filename: String) -> JwtSigningKeySource {
+        JwtSigningKeySource::FromFile {
+            filename,
+            encoding: KeyEncoding::Bytes,
         }
     }
 
@@ -153,12 +176,23 @@ impl JwtSigningKeySource {
                     cause: e,
                 }),
             },
-            x => Err(crate::ArboricError::general(format!(
-                "{:?} not yet implemented!",
-                x
-            ))),
+            JwtSigningKeySource::FromFile { filename, encoding } => match encoding {
+                KeyEncoding::Bytes => Ok(std::fs::read(filename)?),
+                KeyEncoding::Hex => read_file_as_hex(&filename),
+                KeyEncoding::Base64 => read_file_as_base64(&filename),
+            },
         }
     }
+}
+
+fn read_file_as_hex(filename: &String) -> crate::Result<Vec<u8>> {
+    let s = std::fs::read_to_string(filename)?;
+    Ok(hex::decode(&s)?)
+}
+
+fn read_file_as_base64(filename: &String) -> crate::Result<Vec<u8>> {
+    let s = std::fs::read_to_string(filename)?;
+    Ok(base64::decode(&s)?)
 }
 
 #[cfg(test)]
@@ -186,5 +220,4 @@ mod tests {
             configuration.listeners.first().unwrap().listener_address
         );
     }
-
 }

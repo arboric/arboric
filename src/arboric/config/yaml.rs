@@ -27,6 +27,7 @@
 
 use crate::abac;
 use crate::arboric::graphql;
+use crate::arboric::ArboricError;
 use crate::Configuration;
 use http::Uri;
 use log::trace;
@@ -34,12 +35,60 @@ use serde::{Deserialize, Serialize};
 
 /// Read the Configuration from the specified YAML file
 pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configuration> {
-    use abac::MatchAttribute;
+    use std::io::ErrorKind;
 
-    let f = std::fs::File::open(filename)?;
+    match std::fs::File::open(filename) {
+        Ok(f) => read_yaml_config(f),
+        Err(cause) => {
+            trace!("cause.kind() => {:?}", cause.kind());
+            let message = match cause.kind() {
+                ErrorKind::NotFound => format!("File not found: {}!", filename),
+                _ => cause.to_string(),
+            };
+            Err(ArboricError::IoError { message, cause })
+        }
+    }
+}
+
+fn parse_level(s: &String) -> Option<log::Level> {
+    use log::Level;
+    use std::error::Error;
+    use std::str::FromStr;
+    match Level::from_str(s) {
+        Ok(level) => Some(level),
+        Err(err) => {
+            eprintln!(r#"Unrecognised log level "{}" ({})"#, s, err.description());
+            None
+        }
+    }
+}
+
+fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
+    use crate::abac::MatchAttribute;
+
     let yaml_config: YamlConfig = serde_yaml::from_reader(f)?;
 
     let mut config = Configuration::new();
+    let ref mut loggers = config.arboric.loggers;
+
+    let arboric = yaml_config.arboric;
+    if let Some(console) = arboric.log.console {
+        if let Some(level) = parse_level(&console.level) {
+            let console_logger = crate::config::Logger::Console(level);
+            loggers.push(console_logger);
+        }
+    }
+
+    if let Some(file_logger_config) = arboric.log.file {
+        if let Some(level) = parse_level(&file_logger_config.level) {
+            let file_logger = crate::config::Logger::File {
+                location: file_logger_config.location,
+                level,
+            };
+            loggers.push(file_logger);
+        }
+    }
+
     if let Some(listeners) = yaml_config.listeners {
         for listener_config in listeners.iter() {
             config.listener(|mut listener| {
@@ -52,9 +101,31 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
                 listener = listener
                     .port(listener_config.port)
                     .proxy(listener_config.proxy.parse::<Uri>().unwrap());
-                if listener_config.jwt_signing_key.from_env.encoding == "hex" {
-                    listener.jwt_from_env_hex(&listener_config.jwt_signing_key.from_env.key);
+
+                match listener_config.jwt_signing_key {
+                    JwtSigningKey::FromEnv { ref from_env } => match &from_env.encoding {
+                        Some(encoding) => {
+                            if encoding == "hex" {
+                                listener.jwt_from_env_hex(&from_env.key);
+                            } else {
+                                panic!(r#"Unsupported encoding "{}" "#, encoding);
+                            }
+                        }
+                        None => (),
+                    },
+                    JwtSigningKey::FromFile { ref from_file } => {
+                        trace!("from_file => {:?}", &from_file);
+                        match &from_file.encoding {
+                            Some(encoding) => {
+                                panic!(r#"Unsupported encoding "{}" "#, encoding);
+                            }
+                            None => {
+                                listener.jwt_from_file(&from_file.name);
+                            }
+                        }
+                    }
                 }
+
                 if let Some(ref log_to) = listener_config.log_to {
                     if let Some(ref influx_db) = log_to.influx_db {
                         listener.log_to_influx_db(&influx_db.uri, &influx_db.database);
@@ -63,19 +134,26 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
                 if let Some(policies) = listener_config.policies.as_ref() {
                     for policy_def in policies.iter() {
                         let mut policy = abac::Policy::new();
-                        for when in policy_def.when.iter() {
-                            let match_attribute: MatchAttribute = match when {
-                                When::ClaimIsPresent(w) => {
-                                    MatchAttribute::claim_present(&w.claim_is_present)
+                        match &policy_def.when {
+                            Some(ref vec) => {
+                                for when in vec.iter() {
+                                    let match_attribute: MatchAttribute = match when {
+                                        When::ClaimIsPresent(w) => {
+                                            MatchAttribute::claim_present(&w.claim_is_present)
+                                        }
+                                        When::ClaimEquals(w) => {
+                                            MatchAttribute::claim_equals(&w.claim, &w.equals)
+                                        }
+                                        When::ClaimIncludes(w) => {
+                                            MatchAttribute::claim_includes(&w.claim, &w.includes)
+                                        }
+                                    };
+                                    policy.add_match_attribute(match_attribute);
                                 }
-                                When::ClaimEquals(w) => {
-                                    MatchAttribute::claim_equals(&w.claim, &w.equals)
-                                }
-                                When::ClaimIncludes(w) => {
-                                    MatchAttribute::claim_includes(&w.claim, &w.includes)
-                                }
-                            };
-                            policy.add_match_attribute(match_attribute);
+                            }
+                            None => {
+                                policy.add_match_attribute(MatchAttribute::Any);
+                            }
                         }
 
                         if let Some(ref allows) = policy_def.allow {
@@ -149,14 +227,22 @@ struct Listener {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct JwtSigningKey {
-    from_env: FromEnv,
+#[serde(untagged)]
+enum JwtSigningKey {
+    FromEnv { from_env: FromEnv },
+    FromFile { from_file: FromFile },
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct FromEnv {
     key: String,
-    encoding: String,
+    encoding: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct FromFile {
+    name: String,
+    encoding: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -172,7 +258,7 @@ struct InfluxDbConfig {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Policy {
-    when: Vec<When>,
+    when: Option<Vec<When>>,
     allow: Option<Vec<Pattern>>,
     deny: Option<Vec<Pattern>>,
 }
@@ -249,6 +335,22 @@ mod test {
     use super::*;
 
     #[test]
+    fn test_yaml_config_arboric() {
+        let s = r#"---
+arboric:
+  log:
+    console:
+      level: debug
+    file:
+      location: "./arboric.log"
+      level: trace
+"#;
+        let yaml_config: YamlConfig = serde_yaml::from_str(s).unwrap();
+        let arboric = yaml_config.arboric;
+        let log = arboric.log;
+    }
+
+    #[test]
     fn test_yaml_config_policy_allow() {
         let s = r#"---
 when:
@@ -258,9 +360,7 @@ allow:
 - mutation: createHero
 - "*"
 "#;
-        println!("{:?}", s);
         let policy: Policy = serde_yaml::from_str(s).unwrap();
-        println!("{:?}", policy);
         let allow = policy.allow.unwrap();
         assert_eq!(
             Pattern::Query(QueryDef {
@@ -294,17 +394,17 @@ allow:
   allow:
   - query: "*"
 "#;
-        println!("{:?}", s);
         let policies: Vec<Policy> = serde_yaml::from_str(s).unwrap();
         let first = policies.first().unwrap();
-        assert_eq!(When::claim_is_present("sub"), *first.when.get(0).unwrap());
+        let when = &first.when.as_ref().unwrap();
+        assert_eq!(When::claim_is_present("sub"), *when.get(0).unwrap());
         assert_eq!(
             When::claim_equals("iss", "arboric.io"),
-            *first.when.get(1).unwrap()
+            *when.get(1).unwrap()
         );
         assert_eq!(
             When::claim_includes("roles", "admin"),
-            *first.when.get(2).unwrap()
+            *when.get(2).unwrap()
         );
     }
 
@@ -333,20 +433,19 @@ policies:
   - query: "*"
 "#;
         let listener: Listener = serde_yaml::from_str(s).unwrap();
-        println!("{:?}", listener);
         let policies = listener.policies.unwrap();
         let first = policies.first().unwrap();
-        assert_eq!(When::claim_is_present("sub"), *first.when.get(0).unwrap());
+        let when = &first.when.as_ref().unwrap();
+        assert_eq!(When::claim_is_present("sub"), *when.get(0).unwrap());
         assert_eq!(
             When::claim_equals("iss", "arboric.io"),
-            *first.when.get(1).unwrap()
+            *when.get(1).unwrap()
         );
         assert_eq!(
             When::claim_includes("roles", "admin"),
-            *first.when.get(2).unwrap()
+            *when.get(2).unwrap()
         );
         let allow = first.allow.as_ref().unwrap();
-        println!("{:?}", allow);
         assert_eq!(
             allow.get(0).unwrap(),
             &Pattern::Query(QueryDef {
@@ -383,7 +482,6 @@ listeners:
 
     #[test]
     fn test_yaml_config_from_string() {
-        println!("YAML: {:?}", &YAML);
         let yaml_config: YamlConfig = serde_yaml::from_str(YAML).unwrap();
         assert!(yaml_config.arboric.log.console.is_some());
         assert_eq!("info", yaml_config.arboric.log.console.unwrap().level);
@@ -393,25 +491,53 @@ listeners:
         assert!(!listeners.is_empty());
         let listener = listeners.first().unwrap();
         let policies = listener.policies.as_ref().unwrap();
-        println!("{:?}", policies);
         let policy = policies.first().unwrap();
-        assert_eq!(
-            When::ClaimIsPresent(ClaimIsPresent {
-                claim_is_present: String::from("sub")
-            }),
-            *policy.when.get(0).unwrap()
-        );
+        let when = &policy.when.as_ref().unwrap();
+        assert_eq!(When::claim_is_present("sub"), *when.get(0).unwrap());
         assert_eq!(
             When::claim_equals("iss", "arboric.io"),
-            *policy.when.get(1).unwrap()
+            *when.get(1).unwrap()
         );
+    }
+
+    static JWT_FROM_FILE_YAML: &str = r#"
+arboric:
+  log:
+    console:
+      level: info
+listeners:
+- bind: localhost
+  port: 4000
+  proxy: http://localhost:3001/graphql
+  jwt_signing_key:
+    from_file:
+      name: "etc/arboric/secret_key_bytes"
+  policies:
+  - allow:
+    - "*"
+"#;
+
+    #[test]
+    fn test_yaml_config_jwt_from_file() {
+        let yaml_config: YamlConfig = serde_yaml::from_str(JWT_FROM_FILE_YAML).unwrap();
+        let listeners = yaml_config.listeners.unwrap();
+        assert!(!listeners.is_empty());
+        let listener = listeners.first().unwrap();
+        assert_eq!(
+            listener.jwt_signing_key,
+            JwtSigningKey::FromFile {
+                from_file: FromFile {
+                    name: String::from("etc/arboric/secret_key_bytes"),
+                    encoding: None
+                }
+            }
+        )
     }
 
     #[test]
     fn test_yaml_config_from_file() {
         let path = std::path::PathBuf::from("etc/arboric/config.yml");
         let filename = path.canonicalize().unwrap();
-        println!(r#"filename: "{}""#, filename.to_str().unwrap());
         let file = std::fs::File::open(filename.as_path()).unwrap();
         let yaml_config: YamlConfig = serde_yaml::from_reader(file).unwrap();
         assert!(yaml_config.arboric.log.console.is_some());
@@ -421,9 +547,7 @@ listeners:
         let listeners = yaml_config.listeners.unwrap();
         assert!(!listeners.is_empty());
         let first = listeners.first().unwrap();
-        println!("{:?}", first);
         assert_eq!("localhost", first.bind);
         assert_eq!(4000, first.port);
     }
-
 }

@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_pattern_parse() {
-        crate::initialize_logging();
+        crate::initialize_test_logging();
         assert_eq!(
             Pattern::parse("__type"),
             Pattern::Query(FieldPattern("__type".into()))
@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn test_pattern_matches() {
-        crate::initialize_logging();
+        crate::initialize_test_logging();
         let doc = graphql_parser::parse_query("{hero{id name}}").unwrap();
         let op = doc.definitions.first().unwrap();
         if let Operation(od) = op {
@@ -200,6 +200,7 @@ mod tests {
         }
     }
 
+    /// Just a convenience method to construct a [graphql_parser::Pos](graphql_parser::Pos) for testing
     fn pos(line: usize, column: usize) -> graphql_parser::Pos {
         graphql_parser::Pos {
             line: line,
