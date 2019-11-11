@@ -267,7 +267,7 @@ impl PDP {
 mod tests {
     // Import names from outer (for mod tests) scope.
     use super::*;
-    use frank_jwt::{decode, Algorithm};
+    use frank_jwt::{Algorithm, ValidationOptions};
     use serde_json::json;
 
     use std::borrow::Borrow;
@@ -278,39 +278,53 @@ mod tests {
         let secret_key = hex::decode(&secret_key_hex).unwrap();
 
         let s = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE";
-        let (header, payload) = decode(&s, &secret_key, Algorithm::HS256).unwrap();
+        let (header, payload) = frank_jwt::decode(
+            &s,
+            &secret_key,
+            Algorithm::HS256,
+            &ValidationOptions::dangerous(),
+        )
+        .unwrap();
         println!("header => {:?}", &header);
         println!("payload => {:?}", &payload);
         assert_eq!("HS256", header.as_object().unwrap().get("alg").unwrap());
         assert_eq!("1", payload.as_object().unwrap().get("sub").unwrap());
     }
 
-    /// Constructs a test Request using the given claims (assumes a JSON Value::Object
-    /// since I don't know how to write this as a macro) and query string
-    fn request<C: Borrow<serde_json::Value>>(claims: C, query: &str) -> Request {
-        Request {
-            claims: claims.borrow().as_object().unwrap().to_owned(),
-            document: graphql_parser::parse_query(query).unwrap(),
-        }
+    /// Constructs a test Request using the given claims (passes whatever to the
+    /// `json!()` macro) and query string
+    macro_rules! request {
+        ($value:tt, $query:expr) => {
+            Request {
+                claims: json!($value).borrow().as_object().unwrap().to_owned(),
+                document: graphql_parser::parse_query($query).unwrap(),
+            }
+        };
+        ($value:expr, $query:expr) => {
+            Request {
+                claims: $value.borrow().as_object().unwrap().to_owned(),
+                document: graphql_parser::parse_query($query).unwrap(),
+            }
+        };
     }
 
     #[test]
     fn test_abac_match_attributes_claim_present() {
-        let request = request(json!({"sub": "1"}), "{foo{bar}}");
+        let request = request!({"sub": "1"}, "{foo{bar}}");
         assert!(MatchAttribute::claim_present("sub").matches(&request));
         assert!(!MatchAttribute::claim_present("roles").matches(&request));
     }
 
     #[test]
     fn test_abac_match_attributes_claim_equals() {
-        let request = request(json!({"sub": "1"}), "{foo{bar}}");
+        let request = request!({"sub": "1"}, "{foo{bar}}");
         assert!(MatchAttribute::claim_equals("sub", "1").matches(&request));
         assert!(!MatchAttribute::claim_equals("sub", "2").matches(&request));
     }
 
     #[test]
     fn test_abac_match_attributes_claim_includes() {
-        let request = request(json!({"roles": "user,admin"}), "{foo{bar}}");
+        let request = request!({"roles": "user,admin"}, "{foo{bar}}");
         assert!(MatchAttribute::claim_includes("roles", "user").matches(&request));
         assert!(MatchAttribute::claim_includes("roles", "admin").matches(&request));
         assert!(!MatchAttribute::claim_includes("roles", "guest").matches(&request));
@@ -365,7 +379,7 @@ mod tests {
     fn test_pdp_no_rules() {
         crate::initialize_test_logging();
         let pdp = PDP::new();
-        let request = request(json!({"sub": "1"}), "{__schema{queryType{name}}}");
+        let request = request!({"sub": "1"}, "{__schema{queryType{name}}}");
         assert!(!pdp.allows(&request));
     }
 
@@ -373,7 +387,7 @@ mod tests {
     fn test_pdp_allow_any() {
         crate::initialize_test_logging();
         let pdp = PDP::default();
-        let request = request(json!({}), "{__schema{queryType{name}}}");
+        let request = request!({}, "{__schema{queryType{name}}}");
         assert!(pdp.allows(&request));
     }
 
@@ -399,21 +413,21 @@ mod tests {
             policies: vec![user_policy, admin_policy],
         };
 
-        assert!(!pdp.allows(&request(json!({}), "{foo{name}}")));
+        assert!(!pdp.allows(&request!({}, "{foo{name}}")));
         let user_claims = json!({"sub": "1"});
-        assert!(pdp.allows(&request(&user_claims, "{foo{name}}")));
-        assert!(pdp.allows(&request(&user_claims, "query foo {foo{name}}")));
-        assert!(!pdp.allows(&request(&user_claims, "{__schema{queryType{name}}}")));
-        assert!(!pdp.allows(&request(
-            user_claims,
+        assert!(pdp.allows(&request!(&user_claims, "{foo{name}}")));
+        assert!(pdp.allows(&request!(&user_claims, "query foo {foo{name}}")));
+        assert!(!pdp.allows(&request!(&user_claims, "{__schema{queryType{name}}}")));
+        assert!(!pdp.allows(&request!(
+            &user_claims,
             "mutation Createfoo {createfoo(name:\"Shazam!\") {foo{id}}}"
         )));
         let admin_claims = json!({"sub": "2", "roles": "user,admin"});
-        assert!(pdp.allows(&request(&admin_claims, "{foo{name}}")));
-        assert!(pdp.allows(&request(&admin_claims, "query foo {foo{name}}")));
-        assert!(pdp.allows(&request(&admin_claims, "{__schema{queryType{name}}}")));
-        assert!(pdp.allows(&request(
-            admin_claims,
+        assert!(pdp.allows(&request!(&admin_claims, "{foo{name}}")));
+        assert!(pdp.allows(&request!(&admin_claims, "query foo {foo{name}}")));
+        assert!(pdp.allows(&request!(&admin_claims, "{__schema{queryType{name}}}")));
+        assert!(pdp.allows(&request!(
+            &admin_claims,
             "mutation Createfoo {createfoo(name:\"Shazam!\") {foo{id}}}"
         )));
     }
