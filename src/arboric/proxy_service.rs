@@ -2,7 +2,7 @@
 
 use crate::arboric::listener::ListenerContext;
 use crate::Claims;
-use frank_jwt::{decode, Algorithm};
+use frank_jwt::{decode, Algorithm, ValidationOptions};
 use futures::future;
 use http::header::HeaderMap;
 use hyper::rt::Future;
@@ -174,7 +174,12 @@ impl ProxyService {
             if auth_str.starts_with("Bearer ") {
                 let ref token_str = auth_str[7..];
                 trace!("token => {}", &token_str);
-                match decode(&token_str, secret_key_bytes, Algorithm::HS256) {
+                match decode(
+                    &token_str,
+                    secret_key_bytes,
+                    Algorithm::HS256,
+                    &ValidationOptions::default(),
+                ) {
                     Ok((_header, payload)) => match payload {
                         serde_json::Value::Object(map) => Ok(map),
                         x => {
