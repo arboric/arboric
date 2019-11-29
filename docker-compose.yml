@@ -18,8 +18,7 @@ services:
       - influxdb-data:/var/lib/influxdb
     container_name: influxdb
   grafana:
-    image: grafana/grafana
-    user: "104"
+    image: grafana/grafana:5.4.3
     links:
       - influxdb:influxdb
     depends_on:
