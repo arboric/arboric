@@ -3,31 +3,31 @@ arboric:
     console:
       level: info
 listeners:
-- bind: localhost
-  port: 4000
-  proxy: http://localhost:3001/graphql
-  jwt_signing_key:
-    from_file:
-      name: "etc/arboric/secret_key_bytes"
-    # Comment out the previous two lines and uncomment the following lines
-    # to read the JWT secret key from the environment
-    # from_env:
-    #   key: SECRET_KEY_BYTES
-    #   encoding: hex
-  log_to:
-    influx_db:
-      uri: http://localhost:8086
-      database: arboric
-  policies:
-  - when:
-    - claim_is_present: sub
-    allow:
-    - query: "*"
-    deny:
-    - query: "__*"
-    - mutation: "*"
-  - when:
-    - claim: roles
-      includes: admin
-    allow:
-    - "*"
+  - bind: localhost
+    port: 4000
+    proxy: http://localhost:3001/graphql
+    jwt_signing_key:
+      from_file:
+        name: "etc/arboric/secret_key_bytes"
+      # Comment out the previous two lines and uncomment the following lines
+      # to read the JWT secret key from the environment
+      # from_env:
+      #   key: SECRET_KEY_BYTES
+      #   encoding: hex
+    log_to:
+      influx_db:
+        uri: http://localhost:8086
+        database: arboric
+    policies:
+      - when:
+          - claim_is_present: sub
+        allow:
+          - query: "*"
+        deny:
+          - query: "__*"
+          - mutation: "*"
+      - when:
+          - claim: roles
+            includes: admin
+        allow:
+          - "*"
