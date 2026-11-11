@@ -87,7 +87,7 @@ fn count_json_query(body: &str) -> ParsePostResult {
 fn count_top_level_fields(query: &str) -> ParsePostResult {
     trace!("count_top_level_fields({:?})", query);
     let mut results: HashMap<String, usize> = HashMap::new();
-    let document = parse_query(&query)?;
+    let document = parse_query(query)?;
 
     trace!("document => {:?}", document);
     for def in document.definitions.iter() {
@@ -99,7 +99,7 @@ fn count_top_level_fields(query: &str) -> ParsePostResult {
                 update_results(&mut results, &query.selection_set);
             }
             Operation(OperationDefinition::SelectionSet(selection_set)) => {
-                update_results(&mut results, &selection_set);
+                update_results(&mut results, selection_set);
             }
             _ => warn!("{:?}", def),
         }
@@ -146,7 +146,7 @@ mod tests {
         }
         ";
         expected.insert("bar".into(), 1);
-        let (_, counts2) = count_top_level_fields(&q).unwrap().unwrap();
+        let (_, counts2) = count_top_level_fields(q).unwrap().unwrap();
         assert_eq!(counts2, expected);
     }
 }

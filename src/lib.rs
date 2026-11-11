@@ -37,7 +37,7 @@ pub fn initialize_logging(configuration: &Configuration) {
         .map(|logger_conf| {
             println!("logger_conf => {:?}", logger_conf);
             match logger_conf {
-                arboric::config::Logger::Console(level) => init_console_logger(&level),
+                arboric::config::Logger::Console(level) => init_console_logger(level),
                 arboric::config::Logger::File { location, level } => {
                     init_file_logger(location, level)
                 }
@@ -50,19 +50,19 @@ pub fn initialize_logging(configuration: &Configuration) {
 fn make_config(level: &log::Level) -> simplelog::Config {
     let mut config = simplelog::ConfigBuilder::new();
     config.set_thread_level(level.to_level_filter());
-    config.add_filter_allow_str(&ARBORIC);
+    config.add_filter_allow_str(ARBORIC);
     config.build()
 }
 
 fn init_console_logger(level: &log::Level) -> Box<dyn simplelog::SharedLogger> {
     println!("init_console_logger({})", level);
-    let config = make_config(&level);
+    let config = make_config(level);
     SimpleLogger::new(level.to_level_filter(), config)
 }
 
 fn init_file_logger(location: &String, level: &log::Level) -> Box<dyn simplelog::SharedLogger> {
     println!("init_file_logger({}, {})", location, level);
-    let config = make_config(&level);
+    let config = make_config(level);
     let file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)

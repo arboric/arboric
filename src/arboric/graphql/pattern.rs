@@ -46,7 +46,7 @@ impl Pattern {
             } else if pattern.starts_with("query:") {
                 Pattern::query(&pattern.as_str()[6..])
             } else {
-                Pattern::query(&pattern.as_str())
+                Pattern::query(pattern.as_str())
             }
         }
     }
@@ -223,7 +223,7 @@ mod tests {
     }
 
     fn query(s: &str) -> Field {
-        let doc = graphql_parser::parse_query(&s).unwrap();
+        let doc = graphql_parser::parse_query(s).unwrap();
         match doc.definitions.iter().next().unwrap() {
             Operation(OperationDefinition::SelectionSet(selection_set)) => {
                 let first = selection_set.items.iter().next().unwrap();

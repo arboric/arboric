@@ -279,7 +279,7 @@ mod tests {
 
         let s = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE";
         let (header, payload) = decode(
-            &s,
+            s,
             &secret_key,
             Algorithm::HS256,
             &ValidationOptions::dangerous(),
@@ -329,36 +329,36 @@ mod tests {
         let op = doc.definitions.first().unwrap();
         if let Operation(od) = op {
             let allow_any = Rule::Allow(Pattern::Any);
-            assert!(allow_any.matches(&od));
-            assert!(allow_any.allows(&od).unwrap());
+            assert!(allow_any.matches(od));
+            assert!(allow_any.allows(od).unwrap());
 
             let allow_foo = Rule::allow("foo");
-            assert!(allow_foo.matches(&od));
-            assert!(allow_foo.allows(&od).unwrap());
+            assert!(allow_foo.matches(od));
+            assert!(allow_foo.allows(od).unwrap());
 
             let allow_query_foo = Rule::allow("query:foo");
-            assert!(allow_query_foo.matches(&od));
-            assert!(allow_query_foo.allows(&od).unwrap());
+            assert!(allow_query_foo.matches(od));
+            assert!(allow_query_foo.allows(od).unwrap());
 
             let allow_mutation_foo = Rule::allow("mutation:foo");
-            assert!(!allow_mutation_foo.matches(&od));
-            assert!(allow_mutation_foo.allows(&od).is_none());
+            assert!(!allow_mutation_foo.matches(od));
+            assert!(allow_mutation_foo.allows(od).is_none());
 
             let deny_all = Rule::Deny(Pattern::Any);
-            assert!(deny_all.matches(&od));
-            assert!(!deny_all.allows(&od).unwrap());
+            assert!(deny_all.matches(od));
+            assert!(!deny_all.allows(od).unwrap());
 
             let deny_foo = Rule::deny("foo");
-            assert!(deny_foo.matches(&od));
-            assert!(!deny_foo.allows(&od).unwrap());
+            assert!(deny_foo.matches(od));
+            assert!(!deny_foo.allows(od).unwrap());
 
             let deny_query_foo = Rule::deny("query:foo");
-            assert!(deny_query_foo.matches(&od));
-            assert!(!deny_query_foo.allows(&od).unwrap());
+            assert!(deny_query_foo.matches(od));
+            assert!(!deny_query_foo.allows(od).unwrap());
 
             let deny_mutation_foo = Rule::deny("mutation:foo");
-            assert!(!deny_mutation_foo.matches(&od));
-            assert!(deny_mutation_foo.allows(&od).is_none());
+            assert!(!deny_mutation_foo.matches(od));
+            assert!(deny_mutation_foo.allows(od).is_none());
         } else {
             panic!(
                 "Expected Definition::Operation(OperationDefintion), got {:?}!",

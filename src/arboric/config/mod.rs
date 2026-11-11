@@ -178,8 +178,8 @@ impl JwtSigningKeySource {
             },
             JwtSigningKeySource::FromFile { filename, encoding } => match encoding {
                 KeyEncoding::Bytes => Ok(std::fs::read(filename)?),
-                KeyEncoding::Hex => read_file_as_hex(&filename),
-                KeyEncoding::Base64 => read_file_as_base64(&filename),
+                KeyEncoding::Hex => read_file_as_hex(filename),
+                KeyEncoding::Base64 => read_file_as_base64(filename),
             },
         }
     }
