@@ -6,7 +6,8 @@ back to the client.
 
 ## Overview
 
-1. `arboric start` reads the YAML configuration and builds a `Listener`.
+1. `arboric` reads the YAML configuration and builds a `Listener`. (The
+   `start` subcommand exists, but `main` does not check it.)
 2. `Listener::run` binds a TCP socket and accepts connections.
 3. Each connection is served by a `ProxyService` through hyper.
 4. `ProxyService::call` checks the JWT (if a signing key is configured).
@@ -20,10 +21,10 @@ back to the client.
 | `src/bin/arboric.rs`             | CLI entry point; loads config, starts proxy |
 | `src/arboric/listener.rs`        | Binds the socket, accepts connections       |
 | `src/arboric/proxy_service.rs`   | Handles each request                        |
-| `src/arboric.rs`             | `parse_post`, `log_counts`                  |
-| `src/arboric/abac.rs`        | Access control (`PDP`, `Policy`, `Rule`)    |
+| `src/arboric.rs`                 | `parse_post`, `log_counts`                  |
+| `src/arboric/abac.rs`            | Access control (`PDP`, `Policy`, `Rule`)    |
 | `src/arboric/graphql/pattern.rs` | GraphQL patterns used by rules              |
-| `src/arboric/influxdb.rs`    | Optional query metrics                      |
+| `src/arboric/influxdb.rs`        | Optional query metrics                      |
 
 ## Class diagram
 
@@ -43,6 +44,7 @@ classDiagram
     }
     class ListenerContext {
         +SocketAddr listener_address
+        +Option~String~ listener_path (not used yet)
         +Uri api_uri
         +PDP pdp
         +Option~Backend~ influx_db_backend
@@ -87,7 +89,7 @@ classDiagram
     }
     class Backend {
         +Config config
-        +write_points(counts)
+        +write_points(counts) async
     }
     class Request {
         +Claims claims
@@ -152,7 +154,7 @@ sequenceDiagram
         G-->>P: (Document, field counts)
 
         opt influx_db_backend is configured
-            P-)I: log_counts() via spawn_blocking
+            P-)I: log_counts() via tokio::spawn
             Note right of I: Does not delay the request
         end
 
@@ -182,8 +184,9 @@ sequenceDiagram
 ### 1. Start-up
 
 `main` in `src/bin/arboric.rs` loads the YAML file with
-`read_yaml_configuration`. It takes the first listener configuration and calls
-`Listener::new`. This does the following:
+`read_yaml_configuration` and calls `run`. `run` sets up logging, takes the
+first listener configuration, and calls `Listener::new`. This does the
+following:
 
 - Reads the JWT signing key (if configured) into `secret_key_bytes`.
 - Builds one shared hyper HTTP client for the back-end.
@@ -241,14 +244,15 @@ code. The JWT check in step 3 is the only check for `GET`.
    The result is a `graphql_parser` `Document` and a map of top-level field
    names to counts.
 3. **Metrics (optional).** `log_counts` sends the counts to InfluxDB in a
-   `spawn_blocking` task. The request does not wait for it.
+   Tokio task (`tokio::spawn`). The request does not wait for it.
 4. **Access control (only with a signing key).** The proxy builds an
    `arboric::Request { claims, document }` and calls `PDP::allows`:
    - The PDP returns `false` if it has no policies.
    - It keeps the policies whose `MatchAttribute`s all match the claims.
    - It allows the request if any of those policies allows it.
    - A policy allows a request if every operation passes all its matching
-     rules. A matching `Deny` rule rejects the request.
+     rules. A matching `Deny` rule rejects the request. A document with a
+     non-operation definition (for example a fragment) is rejected.
 
    A rejected request gets `401`.
 5. **Forward.** The proxy builds a `POST` to `api_uri` with the original body.
