@@ -12,9 +12,7 @@ use hyper::{Method, Request, Response, StatusCode, Uri};
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use log::{debug, error, trace, warn};
-use simple_error::bail;
 use std::convert::Infallible;
-use std::error::Error;
 use std::sync::Arc;
 
 /// The response body type that the proxy returns
@@ -41,11 +39,11 @@ impl ProxyService {
         let claims: Option<Claims> = match &self.context.secret_key_bytes {
             Some(secret_key_bytes) => {
                 match Self::get_authorization_token(req.headers(), secret_key_bytes) {
-                    Ok(map) => {
+                    Some(map) => {
                         trace!("{:?}", map);
                         Some(map)
                     }
-                    Err(_) => return Ok(respond(StatusCode::UNAUTHORIZED)),
+                    None => return Ok(respond(StatusCode::UNAUTHORIZED)),
                 }
             }
             None => None,
@@ -207,38 +205,27 @@ impl ProxyService {
         }
     }
 
-    fn get_authorization_token(
-        headers: &HeaderMap,
-        secret_key_bytes: &Vec<u8>,
-    ) -> Result<Claims, Box<dyn Error>> {
-        if let Some(authorization) = headers.get(http::header::AUTHORIZATION) {
-            trace!("{} => {:?}", http::header::AUTHORIZATION, authorization);
-            let auth_str = &authorization.to_str()?;
-            if let Some(token_str) = auth_str.strip_prefix("Bearer ") {
-                trace!("token => {}", token_str);
-                match decode(
-                    token_str,
-                    secret_key_bytes,
-                    Algorithm::HS256,
-                    &ValidationOptions::dangerous(),
-                ) {
-                    Ok((_header, payload)) => match payload {
-                        serde_json::Value::Object(map) => Ok(map),
-                        x => {
-                            error!("Expeced JSON Object, got {:?}!", x);
-                            bail!("401 Unauthorized")
-                        }
-                    },
-                    Err(e) => {
-                        error!("{}", e);
-                        bail!("401 Unauthorized")
-                    }
-                }
-            } else {
-                bail!("401 Unauthorized")
+    fn get_authorization_token(headers: &HeaderMap, secret_key_bytes: &Vec<u8>) -> Option<Claims> {
+        let authorization = headers.get(http::header::AUTHORIZATION)?;
+        trace!("{} => {:?}", http::header::AUTHORIZATION, authorization);
+        let auth_str = authorization.to_str().ok()?;
+        let token_str = auth_str.strip_prefix("Bearer ")?;
+        trace!("token => {}", token_str);
+        match decode(
+            token_str,
+            secret_key_bytes,
+            Algorithm::HS256,
+            &ValidationOptions::dangerous(),
+        ) {
+            Ok((_header, serde_json::Value::Object(map))) => Some(map),
+            Ok((_header, x)) => {
+                error!("Expected JSON Object, got {:?}!", x);
+                None
             }
-        } else {
-            bail!("401 Unauthorized")
+            Err(e) => {
+                error!("{}", e);
+                None
+            }
         }
     }
 }
