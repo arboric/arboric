@@ -83,7 +83,7 @@ impl Pattern {
         trace!("matches({:?}, {:?})", &self, &operation_definition);
         match self {
             Pattern::Any => true,
-            Pattern::Query(ref field_pattern) => match operation_definition {
+            Pattern::Query(field_pattern) => match operation_definition {
                 OperationDefinition::Query(query) => {
                     query
                         .selection_set
@@ -102,7 +102,7 @@ impl Pattern {
                 }
                 _ => false,
             },
-            Pattern::Mutation(ref field_pattern) => {
+            Pattern::Mutation(field_pattern) => {
                 match operation_definition {
                     OperationDefinition::Mutation(mutation) => mutation
                         .selection_set
@@ -124,8 +124,8 @@ impl fmt::Display for Pattern {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Pattern::Any => write!(f, "*"),
-            Pattern::Query(ref field_pattern) => write!(f, "query:{}", field_pattern),
-            Pattern::Mutation(ref field_pattern) => write!(f, "mutation:{}", field_pattern),
+            Pattern::Query(field_pattern) => write!(f, "query:{}", field_pattern),
+            Pattern::Mutation(field_pattern) => write!(f, "mutation:{}", field_pattern),
         }
     }
 }
@@ -225,7 +225,7 @@ mod tests {
     fn query(s: &str) -> Field {
         let doc = graphql_parser::parse_query(&s).unwrap();
         match doc.definitions.iter().next().unwrap() {
-            Operation(OperationDefinition::SelectionSet(ref selection_set)) => {
+            Operation(OperationDefinition::SelectionSet(selection_set)) => {
                 let first = selection_set.items.iter().next().unwrap();
                 match first {
                     Selection::Field(field) => field.clone(),

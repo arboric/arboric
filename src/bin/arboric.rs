@@ -1,13 +1,8 @@
 //! The arboric command line
-extern crate hyper;
-
-#[macro_use]
-extern crate clap;
-
 use failure::Error;
 use log::{debug, trace};
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, SubCommand, crate_version};
 
 /// The `arboric` CLI entrypoint
 fn main() -> Result<(), Error> {

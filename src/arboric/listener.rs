@@ -1,8 +1,8 @@
 //! The main proxy that implements hyper::NewService
 //!
 use crate::config::ListenerConfig;
-use futures::future;
 use futures::Future;
+use futures::future;
 use http::Uri;
 use hyper::service::NewService;
 use hyper::{Body, Server};

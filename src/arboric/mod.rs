@@ -2,7 +2,7 @@
 //! in the `arboric::` namespace
 
 use graphql_parser::query::Definition::Operation;
-use graphql_parser::query::{parse_query, Document, OperationDefinition, SelectionSet};
+use graphql_parser::query::{Document, OperationDefinition, SelectionSet, parse_query};
 use log::{debug, info, trace, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::value::Value;

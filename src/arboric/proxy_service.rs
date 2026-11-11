@@ -1,8 +1,8 @@
 //! Arboric ProxyService which does the actual work of the Proxy
 
-use crate::arboric::listener::ListenerContext;
 use crate::Claims;
-use frank_jwt::{decode, Algorithm, ValidationOptions};
+use crate::arboric::listener::ListenerContext;
+use frank_jwt::{Algorithm, ValidationOptions, decode};
 use futures::future;
 use http::header::HeaderMap;
 use hyper::rt::Future;
@@ -212,12 +212,15 @@ impl Service for ProxyService {
         trace!("call({:?}, {:?})", &self, &req);
         trace!("req.method() => {:?}", &req.method());
         let claims: Option<Claims>;
-        if let Some(ref secret_key_bytes) = &self.context.as_ref().secret_key_bytes {
-            if let Ok(map) = Self::get_authorization_token(&req, secret_key_bytes) {
-                trace!("{:?}", map);
-                claims = Some(map);
-            } else {
-                return halt(StatusCode::UNAUTHORIZED);
+        if let Some(secret_key_bytes) = &self.context.as_ref().secret_key_bytes {
+            match Self::get_authorization_token(&req, secret_key_bytes) {
+                Ok(map) => {
+                    trace!("{:?}", map);
+                    claims = Some(map);
+                }
+                _ => {
+                    return halt(StatusCode::UNAUTHORIZED);
+                }
             }
         } else {
             claims = None;

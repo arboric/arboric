@@ -1,7 +1,7 @@
 //! Arboric ABAC (attribute-based access control) modules and functions
 
-use crate::graphql::Pattern;
 use crate::Request;
+use crate::graphql::Pattern;
 use graphql_parser::query::Definition::Operation;
 use graphql_parser::query::OperationDefinition;
 use log::{trace, warn};
@@ -267,7 +267,7 @@ impl PDP {
 mod tests {
     // Import names from outer (for mod tests) scope.
     use super::*;
-    use frank_jwt::{decode, Algorithm, ValidationOptions};
+    use frank_jwt::{Algorithm, ValidationOptions, decode};
     use serde_json::json;
 
     use std::borrow::Borrow;
