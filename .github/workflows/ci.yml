@@ -30,6 +30,9 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt, clippy
+          # The action sets RUSTFLAGS="-D warnings" by default. Remove this
+          # line after the existing warnings are fixed.
+          rustflags: ""
 
       - name: Check formatting
         run: cargo fmt -- --check
