@@ -15,7 +15,7 @@ permissions:
 
 env:
   # We use environment variables to specify the Rust version and other settings once
-  RUST_TOOLCHAIN: 1.95.0
+  RUST_TOOLCHAIN: 1.99.0
   CARGO_TERM_COLOR: always
 
 jobs:
