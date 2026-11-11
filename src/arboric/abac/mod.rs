@@ -61,7 +61,7 @@ impl Policy {
             let all = request.document.definitions.iter().all(|def| match def {
                 Operation(operation_definition) => self.rules.iter().all(|rule| {
                     if rule.matches(operation_definition) {
-                        trace!("Rule {:?} matches {:?}", &rule, &operation_definition);
+                        trace!("Rule {:?} matches {:?}", rule, operation_definition);
                         if let Some(b) = rule.allows(operation_definition) {
                             b
                         } else {
@@ -143,8 +143,8 @@ impl RequestMatcher for MatchAttribute {
         let claims = &request.claims;
         match self {
             MatchAttribute::ClaimPresent { claim } => {
-                trace!("request.claims => {:?}", &request.claims);
-                trace!("claim => {:?}", &claim);
+                trace!("request.claims => {:?}", request.claims);
+                trace!("claim => {:?}", claim);
                 claims.contains_key(claim)
             }
             MatchAttribute::ClaimEquals { claim, value } => {
@@ -194,7 +194,7 @@ impl Rule {
     }
 
     pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
-        trace!("matches({:?}, {:?})", &self, &operation_definition);
+        trace!("matches({:?}, {:?})", self, operation_definition);
         match &self {
             Rule::Allow(pattern) => pattern.matches(operation_definition),
             Rule::Deny(pattern) => pattern.matches(operation_definition),
@@ -202,7 +202,7 @@ impl Rule {
     }
 
     pub fn allows(&self, operation_definition: &OperationDefinition) -> Option<bool> {
-        trace!("allows({:?}, {:?}", &self, &operation_definition);
+        trace!("allows({:?}, {:?}", self, operation_definition);
         match &self {
             Rule::Allow(pattern) => {
                 if pattern.matches(operation_definition) {
@@ -252,7 +252,7 @@ impl PDP {
     }
 
     pub fn allows(&self, request: &Request) -> bool {
-        trace!("allow({:?})", &request);
+        trace!("allow({:?})", request);
         if self.policies.is_empty() {
             return false;
         }

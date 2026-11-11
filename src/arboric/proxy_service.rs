@@ -36,8 +36,8 @@ impl ProxyService {
     /// Handles one inbound request. Errors become HTTP status codes, so this
     /// never fails.
     pub async fn call(&self, req: Request<Incoming>) -> Result<Response<ProxyBody>, Infallible> {
-        trace!("call({:?}, {:?})", &self, &req);
-        trace!("req.method() => {:?}", &req.method());
+        trace!("call({:?}, {:?})", self, req);
+        trace!("req.method() => {:?}", req.method());
         let claims: Option<Claims> = match &self.context.secret_key_bytes {
             Some(secret_key_bytes) => {
                 match Self::get_authorization_token(req.headers(), secret_key_bytes) {
@@ -115,13 +115,13 @@ impl ProxyService {
         claims: Option<Claims>,
         inbound: Request<Incoming>,
     ) -> Response<ProxyBody> {
-        trace!("do_post({:?}, {:?})", &self, &inbound);
+        trace!("do_post({:?}, {:?})", self, inbound);
 
         let (parts, body) = inbound.into_parts();
-        trace!("do_post({:?})", &body);
+        trace!("do_post({:?})", body);
 
         let content_type = Self::get_content_type_as_mime_type(&parts.headers);
-        trace!("content_type => {:?}", &content_type);
+        trace!("content_type => {:?}", content_type);
 
         let context = &self.context;
 
@@ -145,7 +145,7 @@ impl ProxyService {
         let body = String::from_utf8_lossy(&bytes).to_string();
         debug!("body => {:?}", &body);
         if let Ok(Some((document, counts))) = super::parse_post(content_type, &body) {
-            trace!("influx_db_backend => {:?}", &context.influx_db_backend);
+            trace!("influx_db_backend => {:?}", context.influx_db_backend);
             if let Some(backend) = &context.influx_db_backend {
                 super::log_counts(backend, &counts);
             }
@@ -212,10 +212,10 @@ impl ProxyService {
         secret_key_bytes: &Vec<u8>,
     ) -> Result<Claims, Box<dyn Error>> {
         if let Some(authorization) = headers.get(http::header::AUTHORIZATION) {
-            trace!("{} => {:?}", http::header::AUTHORIZATION, &authorization);
+            trace!("{} => {:?}", http::header::AUTHORIZATION, authorization);
             let auth_str = &authorization.to_str()?;
             if let Some(token_str) = auth_str.strip_prefix("Bearer ") {
-                trace!("token => {}", &token_str);
+                trace!("token => {}", token_str);
                 match decode(
                     token_str,
                     secret_key_bytes,

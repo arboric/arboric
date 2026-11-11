@@ -37,7 +37,7 @@ impl Backend {
 
         let mut points: Vec<Point> = Vec::new();
         for (field, n) in map {
-            trace!("{}: {}", &field, &n);
+            trace!("{}: {}", field, n);
             let point = Point::new("queries")
                 .add_tag("field", Value::String(field.clone()))
                 .add_field("n", Value::Integer((*n) as i64))

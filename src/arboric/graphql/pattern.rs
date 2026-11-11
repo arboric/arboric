@@ -80,7 +80,7 @@ impl Pattern {
     /// }
     ///
     pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
-        trace!("matches({:?}, {:?})", &self, &operation_definition);
+        trace!("matches({:?}, {:?})", self, operation_definition);
         match self {
             Pattern::Any => true,
             Pattern::Query(field_pattern) => match operation_definition {

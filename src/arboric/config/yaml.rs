@@ -97,7 +97,7 @@ fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
                         None => (),
                     },
                     JwtSigningKey::FromFile { ref from_file } => {
-                        trace!("from_file => {:?}", &from_file);
+                        trace!("from_file => {:?}", from_file);
                         match &from_file.encoding {
                             Some(encoding) => {
                                 panic!(r#"Unsupported encoding "{}" "#, encoding);
