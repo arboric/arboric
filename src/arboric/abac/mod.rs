@@ -20,6 +20,12 @@ pub struct Policy {
     rules: Vec<Rule>,
 }
 
+impl Default for Policy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Policy {
     /// Constructs an 'empty' Policy
     pub fn new() -> Self {
@@ -232,6 +238,12 @@ pub struct PDP {
     policies: Vec<Policy>,
 }
 
+impl Default for PDP {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PDP {
     /// Constructs a PDP with no policies
     pub fn new() -> PDP {
@@ -244,8 +256,8 @@ impl PDP {
         PDP { policies }
     }
 
-    /// Constructs a default PDP with a single "allow any" Policy.
-    pub fn default() -> PDP {
+    /// Constructs a PDP with a single "allow any" Policy.
+    pub fn allow_any() -> PDP {
         PDP {
             policies: vec![Policy::allow_any()],
         }
@@ -378,7 +390,7 @@ mod tests {
     #[test]
     fn test_pdp_allow_any() {
         crate::initialize_test_logging();
-        let pdp = PDP::default();
+        let pdp = PDP::allow_any();
         let request = request(json!({}), "{__schema{queryType{name}}}");
         assert!(pdp.allows(&request));
     }

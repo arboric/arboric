@@ -18,6 +18,12 @@ pub struct Configuration {
     pub listeners: Vec<ListenerConfig>,
 }
 
+impl Default for Configuration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Configuration {
     // Creates a new, empty [Configuration](arboric::config::Configuration)
     pub fn new() -> Configuration {
@@ -81,7 +87,7 @@ impl ListenerConfig {
             listener_path: None,
             api_uri: api_uri.clone(),
             jwt_signing_key_source: None,
-            pdp: PDP::default(),
+            pdp: PDP::allow_any(),
             influx_db_backend: None,
         }
     }

@@ -18,6 +18,12 @@ pub struct ListenerBuilder {
     influx_db_backend: Option<influxdb::Backend>,
 }
 
+impl Default for ListenerBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ListenerBuilder {
     // Constructs a new ListenerBuilder with no JWT signing key source,
     // an empty Policy list, and no query logging
