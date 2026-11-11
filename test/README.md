@@ -3,6 +3,14 @@
 
 ### Without JWT authentication
 
+Start the backend. It is the Rust `heroes-api` crate (Juniper + Rocket) and listens on port 3001:
+
+```
+cargo run -p heroes-api
+```
+
+Or, to run it with InfluxDB and Grafana in Docker:
+
 ```
 docker-compose up
 ```

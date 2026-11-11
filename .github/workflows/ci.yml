@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "src/**"
+      - "heroes-api/**"
       - "test/**"
       - "tests/**"
       - "Cargo.*"

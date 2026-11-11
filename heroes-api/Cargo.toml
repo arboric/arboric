@@ -1,0 +1,13 @@
+[package]
+name = "heroes-api"
+version = "0.1.0"
+authors = ["Alistair A. Israel <aisrael@gmail.com>"]
+edition = "2024"
+rust-version = "1.99"
+description = "Star Wars 'heroes' GraphQL backend (Juniper + Rocket), used to test Arboric"
+publish = false
+
+[dependencies]
+juniper = "0.18"
+juniper_rocket = "0.11"
+rocket = "0.5"
