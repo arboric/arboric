@@ -25,10 +25,10 @@
 //!       database: arboric
 //! ```
 
-use crate::abac;
-use crate::arboric::graphql;
-use crate::arboric::ArboricError;
 use crate::Configuration;
+use crate::abac;
+use crate::arboric::ArboricError;
+use crate::arboric::graphql;
 use http::Uri;
 use log::trace;
 use serde::{Deserialize, Serialize};
@@ -118,7 +118,7 @@ fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
                     for policy_def in policies.iter() {
                         let mut policy = abac::Policy::new();
                         match &policy_def.when {
-                            Some(ref vec) => {
+                            Some(vec) => {
                                 for when in vec.iter() {
                                     let match_attribute: MatchAttribute = match when {
                                         When::ClaimIsPresent(w) => {
@@ -167,7 +167,7 @@ fn pattern_def_to_graphql_pattern(pattern: &Pattern) -> graphql::Pattern {
     match pattern {
         Pattern::Query(def) => graphql::Pattern::query(&def.query),
         Pattern::Mutation(def) => graphql::Pattern::mutation(&def.mutation),
-        Pattern::SomeString(ref s) => graphql::Pattern::parse(s),
+        Pattern::SomeString(s) => graphql::Pattern::parse(s),
     }
 }
 

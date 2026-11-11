@@ -4,7 +4,7 @@
 use super::{JwtSigningKeySource, ListenerConfig};
 use crate::abac::Policy;
 use crate::arboric::influxdb;
-use hyper::Uri;
+use http::Uri;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 /// A ListenerBuilder implements the fluent-syntax builder for

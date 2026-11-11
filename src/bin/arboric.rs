@@ -1,16 +1,12 @@
 //! The arboric command line
-extern crate hyper;
-
-#[macro_use]
-extern crate clap;
-
 use failure::Error;
 use log::{debug, trace};
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, SubCommand, crate_version};
 
 /// The `arboric` CLI entrypoint
-fn main() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     let matches = App::new("Arboric")
         .version(crate_version!())
         .about("GraphQL API Gateway")
@@ -33,19 +29,19 @@ fn main() -> Result<(), Error> {
 
     let config = arboric::config::yaml::read_yaml_configuration(config_file)?;
 
-    run(config);
+    run(config).await?;
     Ok(())
 }
 
 /// Run the Arboric proxy server according to the given configuration
-pub fn run(config: arboric::Configuration) {
+pub async fn run(config: arboric::Configuration) -> std::io::Result<()> {
     arboric::initialize_logging(&config);
 
     if let Some(listener_config) = config.listeners.first() {
         let proxy = arboric::Listener::new(listener_config.clone());
         trace!("{:?}", proxy);
 
-        proxy.run();
+        proxy.run().await
     } else {
         panic!("No listeners configured! See arboric::Configuration::listener()")
     }
