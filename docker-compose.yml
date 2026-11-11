@@ -4,10 +4,12 @@ volumes:
   grafana-data:
 services:
   test_api:
-    image: aisrael/graphql-dotnet-examples
+    build:
+      context: .
+      dockerfile: heroes-api/Dockerfile
     container_name: test_api
     ports:
-      - 3001:80
+      - 3001:3001
   influxdb:
     image: influxdb:1.5.4
     ports:
