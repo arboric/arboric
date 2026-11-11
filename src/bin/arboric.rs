@@ -1,28 +1,28 @@
 //! The arboric command line
 use log::{debug, trace};
 
-use clap::{App, Arg, SubCommand, crate_version};
+use clap::{Arg, Command, crate_version};
 
 /// The `arboric` CLI entrypoint
 #[tokio::main]
 async fn main() -> arboric::Result<()> {
-    let matches = App::new("Arboric")
+    let matches = Command::new("Arboric")
         .version(crate_version!())
         .about("GraphQL API Gateway")
         .arg(
-            Arg::with_name("config")
-                .short("f")
+            Arg::new("config")
+                .short('f')
                 .long("config")
                 .value_name("FILE")
                 .help("Specify the configuration file to use")
-                .default_value("/var/arboric/config.yml")
-                .takes_value(true),
+                .default_value("/var/arboric/config.yml"),
         )
-        .subcommand(SubCommand::with_name("start").about("start the arboric server"))
+        .subcommand(Command::new("start").about("start the arboric server"))
         .get_matches();
 
     let config_file = matches
-        .value_of("config")
+        .get_one::<String>("config")
+        .map(String::as_str)
         .unwrap_or("/var/arboric/config.yml");
     debug!(r#"Loading configuration from: "{}""#, config_file);
 
