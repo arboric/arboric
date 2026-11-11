@@ -20,7 +20,7 @@ mod proxy_service;
 // arboric::ArboricError;
 pub use error::ArboricError;
 // arboric::Listener
-pub use listener::Listener;
+pub use listener::{BoundListener, Listener};
 // arboric::ProxyService
 pub use proxy_service::ProxyService;
 
@@ -61,7 +61,11 @@ pub fn log_counts(influx_db_backend: &influxdb::Backend, map: &QueryCounts) {
         map.keys().count()
     );
 
-    influx_db_backend.write_points(map);
+    // The InfluxDB client is blocking, so it must not run on an async worker
+    // thread. The request does not wait for the write to finish.
+    let backend = influx_db_backend.clone();
+    let map = map.clone();
+    tokio::task::spawn_blocking(move || backend.write_points(&map));
 }
 
 #[derive(Debug, Serialize, Deserialize)]
