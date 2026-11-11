@@ -6,7 +6,7 @@ edition = "2024"
 rust-version = "1.99"
 
 [dependencies]
-base64 = "0.10"
+base64 = "0.23.1"
 frank_jwt = "3.1.1"
 graphql-parser = "0.2.3"
 hex = "0.4.0"
