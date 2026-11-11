@@ -56,7 +56,7 @@ fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
     let yaml_config: YamlConfig = serde_yaml::from_reader(f)?;
 
     let mut config = Configuration::new();
-    let ref mut loggers = config.arboric.loggers;
+    let loggers = &mut config.arboric.loggers;
 
     let arboric = yaml_config.arboric;
     if let Some(console) = arboric.log.console {
