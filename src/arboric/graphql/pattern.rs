@@ -221,9 +221,9 @@ mod tests {
 
     fn query(s: &str) -> Field {
         let doc = graphql_parser::parse_query(s).unwrap();
-        match doc.definitions.iter().next().unwrap() {
+        match doc.definitions.first().unwrap() {
             Operation(OperationDefinition::SelectionSet(selection_set)) => {
-                let first = selection_set.items.iter().next().unwrap();
+                let first = selection_set.items.first().unwrap();
                 match first {
                     Selection::Field(field) => field.clone(),
                     x => panic!("Don't know what to do with {:?}!", x),

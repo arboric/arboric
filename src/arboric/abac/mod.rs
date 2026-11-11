@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn test_frank_jwt() {
         let secret_key_hex = "fb9f0a56c2195aa7294f7b076d145bb1a701decd06e8e32cbfdc2f3146a11b3637c5b77d2f98ffb5081af31ae180b69bf2b127ff2496f3c252fcaa20c89d1b019a4639fd26056b6136dd327d118c7d833b357d673d4ba79f1997c4d1d47b74549e0b0e827444fe36dcd7411c0a1384140121e099343d074b6a34c9179ed4687d";
-        let secret_key = hex::decode(&secret_key_hex).unwrap();
+        let secret_key = hex::decode(secret_key_hex).unwrap();
 
         let s = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE";
         let (header, payload) = decode(

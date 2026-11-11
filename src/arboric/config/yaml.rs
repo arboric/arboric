@@ -362,7 +362,7 @@ allow:
             Pattern::Query(QueryDef {
                 query: String::from("hero")
             }),
-            *allow.get(0).unwrap()
+            *allow.first().unwrap()
         );
         assert_eq!(
             Pattern::Mutation(MutationDef {
@@ -393,7 +393,7 @@ allow:
         let policies: Vec<Policy> = serde_yaml::from_str(s).unwrap();
         let first = policies.first().unwrap();
         let when = &first.when.as_ref().unwrap();
-        assert_eq!(When::claim_is_present("sub"), *when.get(0).unwrap());
+        assert_eq!(When::claim_is_present("sub"), *when.first().unwrap());
         assert_eq!(
             When::claim_equals("iss", "arboric.io"),
             *when.get(1).unwrap()
@@ -432,7 +432,7 @@ policies:
         let policies = listener.policies.unwrap();
         let first = policies.first().unwrap();
         let when = &first.when.as_ref().unwrap();
-        assert_eq!(When::claim_is_present("sub"), *when.get(0).unwrap());
+        assert_eq!(When::claim_is_present("sub"), *when.first().unwrap());
         assert_eq!(
             When::claim_equals("iss", "arboric.io"),
             *when.get(1).unwrap()
@@ -443,7 +443,7 @@ policies:
         );
         let allow = first.allow.as_ref().unwrap();
         assert_eq!(
-            allow.get(0).unwrap(),
+            allow.first().unwrap(),
             &Pattern::Query(QueryDef {
                 query: String::from("*")
             })
@@ -492,7 +492,7 @@ listeners:
         let policies = listener.policies.as_ref().unwrap();
         let policy = policies.first().unwrap();
         let when = &policy.when.as_ref().unwrap();
-        assert_eq!(When::claim_is_present("sub"), *when.get(0).unwrap());
+        assert_eq!(When::claim_is_present("sub"), *when.first().unwrap());
         assert_eq!(
             When::claim_equals("iss", "arboric.io"),
             *when.get(1).unwrap()

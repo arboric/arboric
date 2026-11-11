@@ -209,7 +209,7 @@ mod tests {
                 .proxy("http://localhost:3000/graphql".parse::<Uri>().unwrap())
         });
         assert!(!configuration.listeners.is_empty());
-        assert_eq!(1, configuration.listeners.iter().count());
+        assert_eq!(1, configuration.listeners.len());
         assert_eq!(
             SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 4000)),
             configuration.listeners.first().unwrap().listener_address
