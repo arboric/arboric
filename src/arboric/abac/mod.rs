@@ -267,7 +267,7 @@ impl PDP {
 mod tests {
     // Import names from outer (for mod tests) scope.
     use super::*;
-    use frank_jwt::{decode, Algorithm};
+    use frank_jwt::{decode, Algorithm, ValidationOptions};
     use serde_json::json;
 
     use std::borrow::Borrow;
@@ -278,7 +278,13 @@ mod tests {
         let secret_key = hex::decode(&secret_key_hex).unwrap();
 
         let s = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE";
-        let (header, payload) = decode(&s, &secret_key, Algorithm::HS256).unwrap();
+        let (header, payload) = decode(
+            &s,
+            &secret_key,
+            Algorithm::HS256,
+            &ValidationOptions::dangerous(),
+        )
+        .unwrap();
         println!("header => {:?}", &header);
         println!("payload => {:?}", &payload);
         assert_eq!("HS256", header.as_object().unwrap().get("alg").unwrap());
