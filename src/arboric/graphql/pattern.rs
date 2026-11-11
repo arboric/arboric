@@ -46,7 +46,7 @@ impl Pattern {
             } else if pattern.starts_with("query:") {
                 Pattern::query(&pattern.as_str()[6..])
             } else {
-                Pattern::query(&pattern.as_str())
+                Pattern::query(pattern.as_str())
             }
         }
     }
@@ -80,7 +80,7 @@ impl Pattern {
     /// }
     ///
     pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
-        trace!("matches({:?}, {:?})", &self, &operation_definition);
+        trace!("matches({:?}, {:?})", self, operation_definition);
         match self {
             Pattern::Any => true,
             Pattern::Query(field_pattern) => match operation_definition {
@@ -148,7 +148,7 @@ impl fmt::Display for FieldPattern {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let FieldPattern(ref s) = *self;
-        write!(f, "{}", &s)
+        write!(f, "{}", s)
     }
 }
 
@@ -195,17 +195,14 @@ mod tests {
         } else {
             panic!(
                 "Expected Definition::Operation(OperationDefintion), got {:?}!",
-                &op
+                op
             );
         }
     }
 
     /// Just a convenience method to construct a [graphql_parser::Pos](graphql_parser::Pos) for testing
     fn pos(line: usize, column: usize) -> graphql_parser::Pos {
-        graphql_parser::Pos {
-            line: line,
-            column: column,
-        }
+        graphql_parser::Pos { line, column }
     }
 
     fn field(name: &str) -> Field {
@@ -223,10 +220,10 @@ mod tests {
     }
 
     fn query(s: &str) -> Field {
-        let doc = graphql_parser::parse_query(&s).unwrap();
-        match doc.definitions.iter().next().unwrap() {
+        let doc = graphql_parser::parse_query(s).unwrap();
+        match doc.definitions.first().unwrap() {
             Operation(OperationDefinition::SelectionSet(selection_set)) => {
-                let first = selection_set.items.iter().next().unwrap();
+                let first = selection_set.items.first().unwrap();
                 match first {
                     Selection::Field(field) => field.clone(),
                     x => panic!("Don't know what to do with {:?}!", x),

@@ -30,6 +30,9 @@ pub struct Listener {
 #[derive(Debug)]
 pub struct ListenerContext {
     pub listener_address: SocketAddr,
+    // TODO: not used yet. It is for matching the inbound request path
+    // (see ListenerConfig), which is not implemented.
+    #[allow(dead_code)]
     pub listener_path: Option<String>,
     pub api_uri: Uri,
     pub pdp: crate::abac::PDP,

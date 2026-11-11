@@ -18,6 +18,12 @@ pub struct ListenerBuilder {
     influx_db_backend: Option<influxdb::Backend>,
 }
 
+impl Default for ListenerBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ListenerBuilder {
     // Constructs a new ListenerBuilder with no JWT signing key source,
     // an empty Policy list, and no query logging
@@ -81,9 +87,9 @@ impl ListenerBuilder {
         self
     }
 
-    pub fn log_to_influx_db(&mut self, uri: &String, database: &String) -> &mut Self {
+    pub fn log_to_influx_db(&mut self, uri: &str, database: &str) -> &mut Self {
         self.influx_db_backend = Some(influxdb::Backend {
-            config: influxdb::Config::new(uri.clone(), database.clone()),
+            config: influxdb::Config::new(uri.to_owned(), database.to_owned()),
         });
         self
     }

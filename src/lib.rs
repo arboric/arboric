@@ -35,9 +35,9 @@ pub fn initialize_logging(configuration: &Configuration) {
         .loggers
         .iter()
         .map(|logger_conf| {
-            println!("logger_conf => {:?}", &logger_conf);
+            println!("logger_conf => {:?}", logger_conf);
             match logger_conf {
-                arboric::config::Logger::Console(level) => init_console_logger(&level),
+                arboric::config::Logger::Console(level) => init_console_logger(level),
                 arboric::config::Logger::File { location, level } => {
                     init_file_logger(location, level)
                 }
@@ -50,24 +50,24 @@ pub fn initialize_logging(configuration: &Configuration) {
 fn make_config(level: &log::Level) -> simplelog::Config {
     let mut config = simplelog::ConfigBuilder::new();
     config.set_thread_level(level.to_level_filter());
-    config.add_filter_allow_str(&ARBORIC);
+    config.add_filter_allow_str(ARBORIC);
     config.build()
 }
 
 fn init_console_logger(level: &log::Level) -> Box<dyn simplelog::SharedLogger> {
-    println!("init_console_logger({})", &level);
-    let config = make_config(&level);
+    println!("init_console_logger({})", level);
+    let config = make_config(level);
     SimpleLogger::new(level.to_level_filter(), config)
 }
 
 fn init_file_logger(location: &String, level: &log::Level) -> Box<dyn simplelog::SharedLogger> {
-    println!("init_file_logger({}, {})", &location, &level);
-    let config = make_config(&level);
+    println!("init_file_logger({}, {})", location, level);
+    let config = make_config(level);
     let file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(location)
-        .unwrap_or_else(|_| panic!(r#"Unable to create log file "{}""#, &location));
+        .unwrap_or_else(|_| panic!(r#"Unable to create log file "{}""#, location));
     simplelog::WriteLogger::new(level.to_level_filter(), config, file)
 }
 
@@ -85,11 +85,11 @@ fn get_env_log_level() -> Option<log::Level> {
     use std::str::FromStr;
 
     if let Ok(val) = env::var("ARBORIC_LOG") {
-        println!("ARBORIC_LOG => \"{}\"", &val);
+        println!("ARBORIC_LOG => \"{}\"", val);
         match log::Level::from_str(val.to_lowercase().as_str()) {
             Ok(level) => Some(level),
             Err(_) => {
-                eprintln!(r#"Unrecognized ARBORIC_LOG value "{}""#, &val);
+                eprintln!(r#"Unrecognized ARBORIC_LOG value "{}""#, val);
                 None
             }
         }

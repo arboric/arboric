@@ -12,9 +12,7 @@ use hyper::{Method, Request, Response, StatusCode, Uri};
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use log::{debug, error, trace, warn};
-use simple_error::bail;
 use std::convert::Infallible;
-use std::error::Error;
 use std::sync::Arc;
 
 /// The response body type that the proxy returns
@@ -36,16 +34,16 @@ impl ProxyService {
     /// Handles one inbound request. Errors become HTTP status codes, so this
     /// never fails.
     pub async fn call(&self, req: Request<Incoming>) -> Result<Response<ProxyBody>, Infallible> {
-        trace!("call({:?}, {:?})", &self, &req);
-        trace!("req.method() => {:?}", &req.method());
+        trace!("call({:?}, {:?})", self, req);
+        trace!("req.method() => {:?}", req.method());
         let claims: Option<Claims> = match &self.context.secret_key_bytes {
             Some(secret_key_bytes) => {
                 match Self::get_authorization_token(req.headers(), secret_key_bytes) {
-                    Ok(map) => {
+                    Some(map) => {
                         trace!("{:?}", map);
                         Some(map)
                     }
-                    Err(_) => return Ok(respond(StatusCode::UNAUTHORIZED)),
+                    None => return Ok(respond(StatusCode::UNAUTHORIZED)),
                 }
             }
             None => None,
@@ -115,13 +113,13 @@ impl ProxyService {
         claims: Option<Claims>,
         inbound: Request<Incoming>,
     ) -> Response<ProxyBody> {
-        trace!("do_post({:?}, {:?})", &self, &inbound);
+        trace!("do_post({:?}, {:?})", self, inbound);
 
         let (parts, body) = inbound.into_parts();
-        trace!("do_post({:?})", &body);
+        trace!("do_post({:?})", body);
 
         let content_type = Self::get_content_type_as_mime_type(&parts.headers);
-        trace!("content_type => {:?}", &content_type);
+        trace!("content_type => {:?}", content_type);
 
         let context = &self.context;
 
@@ -143,9 +141,9 @@ impl ProxyService {
 
         let pdp = &context.pdp;
         let body = String::from_utf8_lossy(&bytes).to_string();
-        debug!("body => {:?}", &body);
+        debug!("body => {:?}", body);
         if let Ok(Some((document, counts))) = super::parse_post(content_type, &body) {
-            trace!("influx_db_backend => {:?}", &context.influx_db_backend);
+            trace!("influx_db_backend => {:?}", context.influx_db_backend);
             if let Some(backend) = &context.influx_db_backend {
                 super::log_counts(backend, &counts);
             }
@@ -207,38 +205,27 @@ impl ProxyService {
         }
     }
 
-    fn get_authorization_token(
-        headers: &HeaderMap,
-        secret_key_bytes: &Vec<u8>,
-    ) -> Result<Claims, Box<dyn Error>> {
-        if let Some(authorization) = headers.get(http::header::AUTHORIZATION) {
-            trace!("{} => {:?}", http::header::AUTHORIZATION, &authorization);
-            let auth_str = &authorization.to_str()?;
-            if let Some(token_str) = auth_str.strip_prefix("Bearer ") {
-                trace!("token => {}", &token_str);
-                match decode(
-                    token_str,
-                    secret_key_bytes,
-                    Algorithm::HS256,
-                    &ValidationOptions::dangerous(),
-                ) {
-                    Ok((_header, payload)) => match payload {
-                        serde_json::Value::Object(map) => Ok(map),
-                        x => {
-                            error!("Expeced JSON Object, got {:?}!", x);
-                            bail!("401 Unauthorized")
-                        }
-                    },
-                    Err(e) => {
-                        error!("{}", e);
-                        bail!("401 Unauthorized")
-                    }
-                }
-            } else {
-                bail!("401 Unauthorized")
+    fn get_authorization_token(headers: &HeaderMap, secret_key_bytes: &Vec<u8>) -> Option<Claims> {
+        let authorization = headers.get(http::header::AUTHORIZATION)?;
+        trace!("{} => {:?}", http::header::AUTHORIZATION, authorization);
+        let auth_str = authorization.to_str().ok()?;
+        let token_str = auth_str.strip_prefix("Bearer ")?;
+        trace!("token => {}", token_str);
+        match decode(
+            token_str,
+            secret_key_bytes,
+            Algorithm::HS256,
+            &ValidationOptions::dangerous(),
+        ) {
+            Ok((_header, serde_json::Value::Object(map))) => Some(map),
+            Ok((_header, x)) => {
+                error!("Expected JSON Object, got {:?}!", x);
+                None
             }
-        } else {
-            bail!("401 Unauthorized")
+            Err(e) => {
+                error!("{}", e);
+                None
+            }
         }
     }
 }

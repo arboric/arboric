@@ -14,7 +14,7 @@ pub trait RequestMatcher {
 ///
 /// * a list of `MatchAttribute`s, and
 /// * a list of `Rule`s
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Policy {
     attributes: Vec<MatchAttribute>,
     rules: Vec<Rule>,
@@ -23,10 +23,7 @@ pub struct Policy {
 impl Policy {
     /// Constructs an 'empty' Policy
     pub fn new() -> Self {
-        Policy {
-            attributes: Vec::new(),
-            rules: Vec::new(),
-        }
+        Self::default()
     }
 
     /// Constructs a Policy that matches and allows any request
@@ -61,12 +58,8 @@ impl Policy {
             let all = request.document.definitions.iter().all(|def| match def {
                 Operation(operation_definition) => self.rules.iter().all(|rule| {
                     if rule.matches(operation_definition) {
-                        trace!("Rule {:?} matches {:?}", &rule, &operation_definition);
-                        if let Some(b) = rule.allows(operation_definition) {
-                            b
-                        } else {
-                            true
-                        }
+                        trace!("Rule {:?} matches {:?}", rule, operation_definition);
+                        rule.allows(operation_definition).unwrap_or(true)
                     } else {
                         true
                     }
@@ -143,8 +136,8 @@ impl RequestMatcher for MatchAttribute {
         let claims = &request.claims;
         match self {
             MatchAttribute::ClaimPresent { claim } => {
-                trace!("request.claims => {:?}", &request.claims);
-                trace!("claim => {:?}", &claim);
+                trace!("request.claims => {:?}", request.claims);
+                trace!("claim => {:?}", claim);
                 claims.contains_key(claim)
             }
             MatchAttribute::ClaimEquals { claim, value } => {
@@ -194,7 +187,7 @@ impl Rule {
     }
 
     pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
-        trace!("matches({:?}, {:?})", &self, &operation_definition);
+        trace!("matches({:?}, {:?})", self, operation_definition);
         match &self {
             Rule::Allow(pattern) => pattern.matches(operation_definition),
             Rule::Deny(pattern) => pattern.matches(operation_definition),
@@ -202,7 +195,7 @@ impl Rule {
     }
 
     pub fn allows(&self, operation_definition: &OperationDefinition) -> Option<bool> {
-        trace!("allows({:?}, {:?}", &self, &operation_definition);
+        trace!("allows({:?}, {:?}", self, operation_definition);
         match &self {
             Rule::Allow(pattern) => {
                 if pattern.matches(operation_definition) {
@@ -227,7 +220,7 @@ impl Rule {
 /// The abac::PDP or Policy Decision Point is responsible for holding
 /// the list of `Policy`s. It evaluates incoming requests and
 /// returns a Permit / Deny decision.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct PDP {
     policies: Vec<Policy>,
 }
@@ -235,24 +228,22 @@ pub struct PDP {
 impl PDP {
     /// Constructs a PDP with no policies
     pub fn new() -> PDP {
-        PDP {
-            policies: Vec::new(),
-        }
+        Self::default()
     }
 
     pub fn with_policies(policies: Vec<Policy>) -> PDP {
-        PDP { policies: policies }
+        PDP { policies }
     }
 
-    /// Constructs a default PDP with a single "allow any" Policy.
-    pub fn default() -> PDP {
+    /// Constructs a PDP with a single "allow any" Policy.
+    pub fn allow_any() -> PDP {
         PDP {
             policies: vec![Policy::allow_any()],
         }
     }
 
     pub fn allows(&self, request: &Request) -> bool {
-        trace!("allow({:?})", &request);
+        trace!("allow({:?})", request);
         if self.policies.is_empty() {
             return false;
         }
@@ -275,18 +266,18 @@ mod tests {
     #[test]
     fn test_frank_jwt() {
         let secret_key_hex = "fb9f0a56c2195aa7294f7b076d145bb1a701decd06e8e32cbfdc2f3146a11b3637c5b77d2f98ffb5081af31ae180b69bf2b127ff2496f3c252fcaa20c89d1b019a4639fd26056b6136dd327d118c7d833b357d673d4ba79f1997c4d1d47b74549e0b0e827444fe36dcd7411c0a1384140121e099343d074b6a34c9179ed4687d";
-        let secret_key = hex::decode(&secret_key_hex).unwrap();
+        let secret_key = hex::decode(secret_key_hex).unwrap();
 
         let s = "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJzdWIiOiIxIiwicm9sZXMiOiJhZG1pbiJ9.OWRGbi-54ERS5stXrvJaofZL23HVbGEzyGmz-YCXbOE";
         let (header, payload) = decode(
-            &s,
+            s,
             &secret_key,
             Algorithm::HS256,
             &ValidationOptions::dangerous(),
         )
         .unwrap();
-        println!("header => {:?}", &header);
-        println!("payload => {:?}", &payload);
+        println!("header => {:?}", header);
+        println!("payload => {:?}", payload);
         assert_eq!("HS256", header.as_object().unwrap().get("alg").unwrap());
         assert_eq!("1", payload.as_object().unwrap().get("sub").unwrap());
     }
@@ -329,40 +320,40 @@ mod tests {
         let op = doc.definitions.first().unwrap();
         if let Operation(od) = op {
             let allow_any = Rule::Allow(Pattern::Any);
-            assert!(allow_any.matches(&od));
-            assert!(allow_any.allows(&od).unwrap());
+            assert!(allow_any.matches(od));
+            assert!(allow_any.allows(od).unwrap());
 
             let allow_foo = Rule::allow("foo");
-            assert!(allow_foo.matches(&od));
-            assert!(allow_foo.allows(&od).unwrap());
+            assert!(allow_foo.matches(od));
+            assert!(allow_foo.allows(od).unwrap());
 
             let allow_query_foo = Rule::allow("query:foo");
-            assert!(allow_query_foo.matches(&od));
-            assert!(allow_query_foo.allows(&od).unwrap());
+            assert!(allow_query_foo.matches(od));
+            assert!(allow_query_foo.allows(od).unwrap());
 
             let allow_mutation_foo = Rule::allow("mutation:foo");
-            assert!(!allow_mutation_foo.matches(&od));
-            assert!(allow_mutation_foo.allows(&od).is_none());
+            assert!(!allow_mutation_foo.matches(od));
+            assert!(allow_mutation_foo.allows(od).is_none());
 
             let deny_all = Rule::Deny(Pattern::Any);
-            assert!(deny_all.matches(&od));
-            assert!(!deny_all.allows(&od).unwrap());
+            assert!(deny_all.matches(od));
+            assert!(!deny_all.allows(od).unwrap());
 
             let deny_foo = Rule::deny("foo");
-            assert!(deny_foo.matches(&od));
-            assert!(!deny_foo.allows(&od).unwrap());
+            assert!(deny_foo.matches(od));
+            assert!(!deny_foo.allows(od).unwrap());
 
             let deny_query_foo = Rule::deny("query:foo");
-            assert!(deny_query_foo.matches(&od));
-            assert!(!deny_query_foo.allows(&od).unwrap());
+            assert!(deny_query_foo.matches(od));
+            assert!(!deny_query_foo.allows(od).unwrap());
 
             let deny_mutation_foo = Rule::deny("mutation:foo");
-            assert!(!deny_mutation_foo.matches(&od));
-            assert!(deny_mutation_foo.allows(&od).is_none());
+            assert!(!deny_mutation_foo.matches(od));
+            assert!(deny_mutation_foo.allows(od).is_none());
         } else {
             panic!(
                 "Expected Definition::Operation(OperationDefintion), got {:?}!",
-                &op
+                op
             );
         }
     }
@@ -378,7 +369,7 @@ mod tests {
     #[test]
     fn test_pdp_allow_any() {
         crate::initialize_test_logging();
-        let pdp = PDP::default();
+        let pdp = PDP::allow_any();
         let request = request(json!({}), "{__schema{queryType{name}}}");
         assert!(pdp.allows(&request));
     }

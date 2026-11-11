@@ -12,7 +12,7 @@ pub use listener_builder::ListenerBuilder;
 pub mod yaml;
 
 /// The 'root' level configuration
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Configuration {
     pub arboric: ArboricConfiguration,
     pub listeners: Vec<ListenerConfig>,
@@ -21,12 +21,7 @@ pub struct Configuration {
 impl Configuration {
     // Creates a new, empty [Configuration](arboric::config::Configuration)
     pub fn new() -> Configuration {
-        Configuration {
-            arboric: ArboricConfiguration {
-                loggers: Vec::new(),
-            },
-            listeners: Vec::new(),
-        }
+        Self::default()
     }
 
     pub fn listener<F>(&mut self, f: F)
@@ -42,7 +37,7 @@ impl Configuration {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ArboricConfiguration {
     pub loggers: Vec<Logger>,
 }
@@ -81,7 +76,7 @@ impl ListenerConfig {
             listener_path: None,
             api_uri: api_uri.clone(),
             jwt_signing_key_source: None,
-            pdp: PDP::default(),
+            pdp: PDP::allow_any(),
             influx_db_backend: None,
         }
     }
@@ -155,7 +150,7 @@ impl JwtSigningKeySource {
     pub fn get_secret_key_bytes(&self) -> crate::Result<Vec<u8>> {
         match self {
             JwtSigningKeySource::Value(secret, encoding) => match encoding {
-                KeyEncoding::Hex => Ok(hex::decode(&secret)?),
+                KeyEncoding::Hex => Ok(hex::decode(secret)?),
                 KeyEncoding::Base64 => Ok(base64::decode(&secret)?),
                 x => Err(crate::ArboricError::general(format!(
                     "Not yet implemented: {:?}!",
@@ -178,8 +173,8 @@ impl JwtSigningKeySource {
             },
             JwtSigningKeySource::FromFile { filename, encoding } => match encoding {
                 KeyEncoding::Bytes => Ok(std::fs::read(filename)?),
-                KeyEncoding::Hex => read_file_as_hex(&filename),
-                KeyEncoding::Base64 => read_file_as_base64(&filename),
+                KeyEncoding::Hex => read_file_as_hex(filename),
+                KeyEncoding::Base64 => read_file_as_base64(filename),
             },
         }
     }
@@ -214,7 +209,7 @@ mod tests {
                 .proxy("http://localhost:3000/graphql".parse::<Uri>().unwrap())
         });
         assert!(!configuration.listeners.is_empty());
-        assert_eq!(1, configuration.listeners.iter().count());
+        assert_eq!(1, configuration.listeners.len());
         assert_eq!(
             SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 4000)),
             configuration.listeners.first().unwrap().listener_address

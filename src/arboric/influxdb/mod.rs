@@ -15,7 +15,7 @@ impl Config {
     pub fn new(uri: String, database: String) -> Config {
         Config {
             influx_db_uri: uri,
-            database: database,
+            database,
             precision: Precision::Milliseconds,
         }
     }
@@ -37,7 +37,7 @@ impl Backend {
 
         let mut points: Vec<Point> = Vec::new();
         for (field, n) in map {
-            trace!("{}: {}", &field, &n);
+            trace!("{}: {}", field, n);
             let point = Point::new("queries")
                 .add_tag("field", Value::String(field.clone()))
                 .add_field("n", Value::Integer((*n) as i64))
@@ -47,12 +47,12 @@ impl Backend {
 
         // if Precision is None, the default is second
         // Multiple write
-        let _ = client
+        client
             .write_points(
                 Points::create_new(points),
                 Some(Precision::Milliseconds),
                 None,
             )
-            .unwrap();
+            .unwrap()
     }
 }

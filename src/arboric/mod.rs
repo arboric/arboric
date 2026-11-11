@@ -28,7 +28,7 @@ type QueryCounts = HashMap<String, usize>;
 type ParsePostResult = crate::Result<Option<(Document, QueryCounts)>>;
 
 pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> ParsePostResult {
-    trace!("parse_post({:?}, {:?})", &content_type, &body);
+    trace!("parse_post({:?}, {:?})", content_type, body);
     let application_graphql: mime::Mime = "application/graphql".parse().unwrap();
     match content_type {
         Some(ref mime_type) if &application_graphql == mime_type => count_top_level_fields(body),
@@ -42,7 +42,7 @@ pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> ParsePostR
             }
         }
         Some(mime_type) => {
-            warn!("Don't know how to handle {}!", &mime_type);
+            warn!("Don't know how to handle {}!", mime_type);
             Ok(None)
         }
         None => {
@@ -53,7 +53,7 @@ pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> ParsePostR
 }
 
 pub fn log_counts(influx_db_backend: &influxdb::Backend, map: &QueryCounts) {
-    trace!("log_counts({:?}, {:?}", &influx_db_backend, &map);
+    trace!("log_counts({:?}, {:?}", influx_db_backend, map);
     let total: usize = map.values().sum();
     info!(
         "Found {} ({} unique) fields/queries",
@@ -76,20 +76,20 @@ struct GraphQLJSONQuery {
 }
 
 fn count_json_query(body: &str) -> ParsePostResult {
-    trace!("count_json_query({})", &body);
+    trace!("count_json_query({})", body);
     let q: GraphQLJSONQuery = serde_json::from_str(body)?;
-    trace!("{:?}", &q);
-    trace!("{}", &q.query);
+    trace!("{:?}", q);
+    trace!("{}", q.query);
     count_top_level_fields(q.query.as_str())
 }
 
 /// Counts the top level fields in the given GraphQL query string
 fn count_top_level_fields(query: &str) -> ParsePostResult {
-    trace!("count_top_level_fields({:?})", &query);
+    trace!("count_top_level_fields({:?})", query);
     let mut results: HashMap<String, usize> = HashMap::new();
-    let document = parse_query(&query)?;
+    let document = parse_query(query)?;
 
-    trace!("document => {:?}", &document);
+    trace!("document => {:?}", document);
     for def in document.definitions.iter() {
         match def {
             Operation(OperationDefinition::Query(query)) => {
@@ -99,20 +99,20 @@ fn count_top_level_fields(query: &str) -> ParsePostResult {
                 update_results(&mut results, &query.selection_set);
             }
             Operation(OperationDefinition::SelectionSet(selection_set)) => {
-                update_results(&mut results, &selection_set);
+                update_results(&mut results, selection_set);
             }
             _ => warn!("{:?}", def),
         }
     }
 
-    return Ok(Some((document, results)));
+    Ok(Some((document, results)))
 }
 
 fn update_results(results: &mut HashMap<String, usize>, selection_set: &SelectionSet) {
     for selection in selection_set.items.iter() {
         match selection {
             graphql_parser::query::Selection::Field(field) => {
-                trace!("field.name => {}", &field.name);
+                trace!("field.name => {}", field.name);
                 let n = results.entry(field.name.clone()).or_insert(0);
                 *n += 1;
             }
@@ -146,7 +146,7 @@ mod tests {
         }
         ";
         expected.insert("bar".into(), 1);
-        let (_, counts2) = count_top_level_fields(&q).unwrap().unwrap();
+        let (_, counts2) = count_top_level_fields(q).unwrap().unwrap();
         assert_eq!(counts2, expected);
     }
 }

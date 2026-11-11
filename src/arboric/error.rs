@@ -1,59 +1,57 @@
 //! The ArboricError is an Error type used to 'wrap' most other
 //! runtime errors
-use failure::Fail;
 
 /// Arboric error type to 'wrap' other, underlying error causes
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum ArboricError {
-    #[fail(display = "{}", message)]
+    #[error("{message}")]
     GeneralError { message: String },
 
-    #[fail(display = "Unable to find or decode ENV['{}']", message)]
+    #[error("Unable to find or decode ENV['{message}']")]
     EnvVarError {
         message: String,
-        #[cause]
+        #[source]
         cause: std::env::VarError,
     },
 
-    #[fail(display = "{}", message)]
+    #[error("{message}")]
     HexDecodeError {
         message: String,
-        #[cause]
+        #[source]
         cause: hex::FromHexError,
     },
 
-    #[fail(display = "{}", message)]
+    #[error("{message}")]
     Base64DecodeError {
         message: String,
-        #[cause]
+        #[source]
         cause: base64::DecodeError,
     },
 
-    #[fail(display = "{}", message)]
+    #[error("{message}")]
     IoError {
         message: String,
-        #[cause]
+        #[source]
         cause: std::io::Error,
     },
 
-    #[fail(display = "{}", message)]
+    #[error("{message}")]
     JsonError {
         message: String,
-        #[cause]
+        #[source]
         cause: serde_json::Error,
     },
 
-    #[fail(display = "{}", message)]
+    #[error("{message}")]
     YamlError {
         message: String,
-        #[cause]
+        #[source]
         cause: serde_yaml::Error,
     },
 
-    #[fail(display = "{}", message)]
+    #[error("{message}")]
     GraphqlParserError {
         message: String,
-        #[cause]
         cause: graphql_parser::query::ParseError,
     },
 }
@@ -65,33 +63,6 @@ impl ArboricError {
         }
     }
 }
-
-// impl std::error::Error for ArboricError {
-//     fn description(&self) -> &str {
-//         match *self {
-//             ArboricError::GeneralError {message} => message.as_ref(),
-//             ArboricError::EnvVarError { message, cause } => message.as_ref(),
-//             ArboricError::HexDecodeError { message, cause } => message.as_ref(),
-//             ArboricError::Base64DecodeError { message, cause } => message.as_ref(),
-//             ArboricError::JsonError { message, cause } => message.as_ref(),
-//             ArboricError::YamlError { message, cause } => message.as_ref(),
-//             ArboricError::GraphqlParserError { message, cause } => message.as_ref(),
-//         }
-//     }
-// }
-
-// macro_rules! impl_from {
-//     ($($type:ty),+) => {
-//         $(
-//             impl From<$type> for ArboricError {
-//                 fn from(error: $type) -> Self {
-//                     ArboricError::GeneralError { message: format!("{:?}", error) }
-//                 }
-//             }
-//         )*
-//     };
-// }
-// impl_from!(hex::FromHexError);
 
 impl From<std::env::VarError> for ArboricError {
     fn from(error: std::env::VarError) -> Self {
