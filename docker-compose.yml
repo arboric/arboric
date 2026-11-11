@@ -11,13 +11,17 @@ services:
     ports:
       - 3001:3001
   influxdb:
-    image: influxdb:1.5.4
+    image: influxdb:3.11-core
+    # Local development only: authentication is disabled
+    command: influxdb3 serve --without-auth --data-dir /var/lib/influxdb3
     ports:
       - 8086:8086
     environment:
-      INFLUXDB_DB: arboric
+      INFLUXDB3_NODE_ID: node0
+      INFLUXDB3_OBJECT_STORE: file
+      INFLUXDB3_HTTP_BIND_ADDR: 0.0.0.0:8086
     volumes:
-      - influxdb-data:/var/lib/influxdb
+      - influxdb-data:/var/lib/influxdb3
     container_name: influxdb
   grafana:
     image: grafana/grafana

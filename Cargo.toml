@@ -8,14 +8,14 @@ rust-version = "1.99"
 [dependencies]
 base64 = "0.23.1"
 frank_jwt = "3.1.1"
-graphql-parser = "0.2.3"
+graphql-parser = "0.4.1"
 hex = "0.4.0"
 bytes = "1"
 http = "1"
 http-body-util = "0.1"
 hyper = { version = "1", features = ["server", "client", "http1"] }
 hyper-util = { version = "0.1", features = ["tokio", "server-auto", "server-graceful", "client-legacy", "http1"] }
-influx_db_client = "0.3.6"
+influx_db_client = "0.7.0"
 log = { version = "0.4", features = ["serde"] }
 mime = "0.3.18"
 regex = "1"

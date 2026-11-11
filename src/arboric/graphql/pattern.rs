@@ -79,7 +79,7 @@ impl Pattern {
     ///     assert!(!Pattern::parse("mutation:createHero").matches(od));
     /// }
     ///
-    pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
+    pub fn matches(&self, operation_definition: &OperationDefinition<'_, String>) -> bool {
         trace!("matches({:?}, {:?})", self, operation_definition);
         match self {
             Pattern::Any => true,
@@ -135,7 +135,7 @@ impl fmt::Display for Pattern {
 pub struct FieldPattern(String);
 
 impl FieldPattern {
-    pub fn matches<F: Borrow<Field>>(&self, field: F) -> bool {
+    pub fn matches<'a, F: Borrow<Field<'a, String>>>(&self, field: F) -> bool {
         let FieldPattern(s) = self;
         // TODO: compile Regex once
         Regex::new(&s.replace("*", ".*"))
@@ -205,7 +205,7 @@ mod tests {
         graphql_parser::Pos { line, column }
     }
 
-    fn field(name: &str) -> Field {
+    fn field(name: &str) -> Field<'static, String> {
         Field {
             position: pos(1, 1),
             alias: None,
@@ -219,7 +219,7 @@ mod tests {
         }
     }
 
-    fn query(s: &str) -> Field {
+    fn query(s: &str) -> Field<'_, String> {
         let doc = graphql_parser::parse_query(s).unwrap();
         match doc.definitions.first().unwrap() {
             Operation(OperationDefinition::SelectionSet(selection_set)) => {
