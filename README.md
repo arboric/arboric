@@ -3,6 +3,8 @@ Arboric GraphQL API Gateway
 
 **Current version:** 0.2.1 Alpha
 
+**Website:** <https://arboric.github.io>
+
 Arboric is the first, and so far only API proxy / gateway dedicated specifically for GraphQL. It aims to provide several key features:
 
 ### Auditing / Metering
