@@ -102,6 +102,7 @@ impl ProxyService {
         };
 
         Box::new(body.concat2().from_err().and_then(move |chunk| {
+            let _ = &parts;
             let uri = &context.as_ref().api_uri;
             debug!("uri => {}", uri);
 
