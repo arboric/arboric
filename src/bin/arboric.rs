@@ -5,7 +5,7 @@ use clap::{App, Arg, SubCommand, crate_version};
 
 /// The `arboric` CLI entrypoint
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> arboric::Result<()> {
     let matches = App::new("Arboric")
         .version(crate_version!())
         .about("GraphQL API Gateway")
