@@ -14,25 +14,16 @@ pub trait RequestMatcher {
 ///
 /// * a list of `MatchAttribute`s, and
 /// * a list of `Rule`s
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Policy {
     attributes: Vec<MatchAttribute>,
     rules: Vec<Rule>,
 }
 
-impl Default for Policy {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Policy {
     /// Constructs an 'empty' Policy
     pub fn new() -> Self {
-        Policy {
-            attributes: Vec::new(),
-            rules: Vec::new(),
-        }
+        Self::default()
     }
 
     /// Constructs a Policy that matches and allows any request
@@ -68,11 +59,7 @@ impl Policy {
                 Operation(operation_definition) => self.rules.iter().all(|rule| {
                     if rule.matches(operation_definition) {
                         trace!("Rule {:?} matches {:?}", rule, operation_definition);
-                        if let Some(b) = rule.allows(operation_definition) {
-                            b
-                        } else {
-                            true
-                        }
+                        rule.allows(operation_definition).unwrap_or(true)
                     } else {
                         true
                     }
@@ -233,23 +220,15 @@ impl Rule {
 /// The abac::PDP or Policy Decision Point is responsible for holding
 /// the list of `Policy`s. It evaluates incoming requests and
 /// returns a Permit / Deny decision.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct PDP {
     policies: Vec<Policy>,
-}
-
-impl Default for PDP {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl PDP {
     /// Constructs a PDP with no policies
     pub fn new() -> PDP {
-        PDP {
-            policies: Vec::new(),
-        }
+        Self::default()
     }
 
     pub fn with_policies(policies: Vec<Policy>) -> PDP {

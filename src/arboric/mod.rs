@@ -105,7 +105,7 @@ fn count_top_level_fields(query: &str) -> ParsePostResult {
         }
     }
 
-    return Ok(Some((document, results)));
+    Ok(Some((document, results)))
 }
 
 fn update_results(results: &mut HashMap<String, usize>, selection_set: &SelectionSet) {

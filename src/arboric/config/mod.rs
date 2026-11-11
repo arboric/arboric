@@ -12,27 +12,16 @@ pub use listener_builder::ListenerBuilder;
 pub mod yaml;
 
 /// The 'root' level configuration
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Configuration {
     pub arboric: ArboricConfiguration,
     pub listeners: Vec<ListenerConfig>,
 }
 
-impl Default for Configuration {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Configuration {
     // Creates a new, empty [Configuration](arboric::config::Configuration)
     pub fn new() -> Configuration {
-        Configuration {
-            arboric: ArboricConfiguration {
-                loggers: Vec::new(),
-            },
-            listeners: Vec::new(),
-        }
+        Self::default()
     }
 
     pub fn listener<F>(&mut self, f: F)
@@ -48,7 +37,7 @@ impl Configuration {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ArboricConfiguration {
     pub loggers: Vec<Logger>,
 }
@@ -161,7 +150,7 @@ impl JwtSigningKeySource {
     pub fn get_secret_key_bytes(&self) -> crate::Result<Vec<u8>> {
         match self {
             JwtSigningKeySource::Value(secret, encoding) => match encoding {
-                KeyEncoding::Hex => Ok(hex::decode(&secret)?),
+                KeyEncoding::Hex => Ok(hex::decode(secret)?),
                 KeyEncoding::Base64 => Ok(base64::decode(&secret)?),
                 x => Err(crate::ArboricError::general(format!(
                     "Not yet implemented: {:?}!",

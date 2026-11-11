@@ -47,12 +47,12 @@ impl Backend {
 
         // if Precision is None, the default is second
         // Multiple write
-        let _ = client
+        client
             .write_points(
                 Points::create_new(points),
                 Some(Precision::Milliseconds),
                 None,
             )
-            .unwrap();
+            .unwrap()
     }
 }

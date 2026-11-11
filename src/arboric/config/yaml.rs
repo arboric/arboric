@@ -86,16 +86,15 @@ fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
                     .proxy(listener_config.proxy.parse::<Uri>().unwrap());
 
                 match listener_config.jwt_signing_key {
-                    JwtSigningKey::FromEnv { ref from_env } => match &from_env.encoding {
-                        Some(encoding) => {
+                    JwtSigningKey::FromEnv { ref from_env } => {
+                        if let Some(encoding) = &from_env.encoding {
                             if encoding == "hex" {
                                 listener.jwt_from_env_hex(&from_env.key);
                             } else {
                                 panic!(r#"Unsupported encoding "{}" "#, encoding);
                             }
                         }
-                        None => (),
-                    },
+                    }
                     JwtSigningKey::FromFile { ref from_file } => {
                         trace!("from_file => {:?}", from_file);
                         match &from_file.encoding {
@@ -109,11 +108,12 @@ fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
                     }
                 }
 
-                if let Some(ref log_to) = listener_config.log_to {
-                    if let Some(ref influx_db) = log_to.influx_db {
-                        listener.log_to_influx_db(&influx_db.uri, &influx_db.database);
-                    }
+                if let Some(ref log_to) = listener_config.log_to
+                    && let Some(ref influx_db) = log_to.influx_db
+                {
+                    listener.log_to_influx_db(&influx_db.uri, &influx_db.database);
                 }
+
                 if let Some(policies) = listener_config.policies.as_ref() {
                     for policy_def in policies.iter() {
                         let mut policy = abac::Policy::new();
@@ -248,6 +248,7 @@ struct Policy {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
+#[allow(clippy::enum_variant_names)]
 enum When {
     ClaimIsPresent(ClaimIsPresent),
     ClaimEquals(ClaimEquals),
