@@ -15,7 +15,7 @@ impl Config {
     pub fn new(uri: String, database: String) -> Config {
         Config {
             influx_db_uri: uri,
-            database: database,
+            database,
             precision: Precision::Milliseconds,
         }
     }

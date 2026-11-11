@@ -202,10 +202,7 @@ mod tests {
 
     /// Just a convenience method to construct a [graphql_parser::Pos](graphql_parser::Pos) for testing
     fn pos(line: usize, column: usize) -> graphql_parser::Pos {
-        graphql_parser::Pos {
-            line: line,
-            column: column,
-        }
+        graphql_parser::Pos { line, column }
     }
 
     fn field(name: &str) -> Field {

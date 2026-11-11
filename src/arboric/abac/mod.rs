@@ -241,7 +241,7 @@ impl PDP {
     }
 
     pub fn with_policies(policies: Vec<Policy>) -> PDP {
-        PDP { policies: policies }
+        PDP { policies }
     }
 
     /// Constructs a default PDP with a single "allow any" Policy.
