@@ -143,7 +143,7 @@ impl ProxyService {
 
         let pdp = &context.pdp;
         let body = String::from_utf8_lossy(&bytes).to_string();
-        debug!("body => {:?}", &body);
+        debug!("body => {:?}", body);
         if let Ok(Some((document, counts))) = super::parse_post(content_type, &body) {
             trace!("influx_db_backend => {:?}", context.influx_db_backend);
             if let Some(backend) = &context.influx_db_backend {

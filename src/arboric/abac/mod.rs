@@ -285,8 +285,8 @@ mod tests {
             &ValidationOptions::dangerous(),
         )
         .unwrap();
-        println!("header => {:?}", &header);
-        println!("payload => {:?}", &payload);
+        println!("header => {:?}", header);
+        println!("payload => {:?}", payload);
         assert_eq!("HS256", header.as_object().unwrap().get("alg").unwrap());
         assert_eq!("1", payload.as_object().unwrap().get("sub").unwrap());
     }
@@ -362,7 +362,7 @@ mod tests {
         } else {
             panic!(
                 "Expected Definition::Operation(OperationDefintion), got {:?}!",
-                &op
+                op
             );
         }
     }

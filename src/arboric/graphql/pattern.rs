@@ -148,7 +148,7 @@ impl fmt::Display for FieldPattern {
     // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let FieldPattern(ref s) = *self;
-        write!(f, "{}", &s)
+        write!(f, "{}", s)
     }
 }
 
@@ -195,7 +195,7 @@ mod tests {
         } else {
             panic!(
                 "Expected Definition::Operation(OperationDefintion), got {:?}!",
-                &op
+                op
             );
         }
     }

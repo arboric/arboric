@@ -42,7 +42,7 @@ pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> ParsePostR
             }
         }
         Some(mime_type) => {
-            warn!("Don't know how to handle {}!", &mime_type);
+            warn!("Don't know how to handle {}!", mime_type);
             Ok(None)
         }
         None => {
