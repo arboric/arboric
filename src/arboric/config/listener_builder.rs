@@ -88,9 +88,10 @@ impl ListenerBuilder {
     }
 
     pub fn log_to_influx_db(&mut self, uri: &str, database: &str) -> &mut Self {
-        self.influx_db_backend = Some(influxdb::Backend {
-            config: influxdb::Config::new(uri.to_owned(), database.to_owned()),
-        });
+        self.influx_db_backend = Some(influxdb::Backend::new(influxdb::Config::new(
+            uri.to_owned(),
+            database.to_owned(),
+        )));
         self
     }
 

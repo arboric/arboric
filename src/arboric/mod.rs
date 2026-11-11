@@ -25,7 +25,7 @@ pub use listener::{BoundListener, Listener};
 pub use proxy_service::ProxyService;
 
 type QueryCounts = HashMap<String, usize>;
-type ParsePostResult = crate::Result<Option<(Document, QueryCounts)>>;
+type ParsePostResult = crate::Result<Option<(Document<'static, String>, QueryCounts)>>;
 
 pub fn parse_post(content_type: Option<mime::Mime>, body: &String) -> ParsePostResult {
     trace!("parse_post({:?}, {:?})", content_type, body);
@@ -61,11 +61,10 @@ pub fn log_counts(influx_db_backend: &influxdb::Backend, map: &QueryCounts) {
         map.keys().count()
     );
 
-    // The InfluxDB client is blocking, so it must not run on an async worker
-    // thread. The request does not wait for the write to finish.
+    // The request does not wait for the write to finish.
     let backend = influx_db_backend.clone();
     let map = map.clone();
-    tokio::task::spawn_blocking(move || backend.write_points(&map));
+    tokio::spawn(async move { backend.write_points(&map).await });
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -87,7 +86,7 @@ fn count_json_query(body: &str) -> ParsePostResult {
 fn count_top_level_fields(query: &str) -> ParsePostResult {
     trace!("count_top_level_fields({:?})", query);
     let mut results: HashMap<String, usize> = HashMap::new();
-    let document = parse_query(query)?;
+    let document = parse_query::<String>(query)?.into_static();
 
     trace!("document => {:?}", document);
     for def in document.definitions.iter() {
@@ -108,7 +107,7 @@ fn count_top_level_fields(query: &str) -> ParsePostResult {
     Ok(Some((document, results)))
 }
 
-fn update_results(results: &mut HashMap<String, usize>, selection_set: &SelectionSet) {
+fn update_results(results: &mut HashMap<String, usize>, selection_set: &SelectionSet<'_, String>) {
     for selection in selection_set.items.iter() {
         match selection {
             graphql_parser::query::Selection::Field(field) => {

@@ -2,6 +2,7 @@
 //! for Arboric's configuration model
 
 use crate::abac::PDP;
+use base64::Engine;
 use http::Uri;
 use std::env;
 use std::net::{IpAddr, SocketAddr};
@@ -151,7 +152,9 @@ impl JwtSigningKeySource {
         match self {
             JwtSigningKeySource::Value(secret, encoding) => match encoding {
                 KeyEncoding::Hex => Ok(hex::decode(secret)?),
-                KeyEncoding::Base64 => Ok(base64::decode(&secret)?),
+                KeyEncoding::Base64 => {
+                    Ok(base64::engine::general_purpose::STANDARD.decode(secret)?)
+                }
                 x => Err(crate::ArboricError::general(format!(
                     "Not yet implemented: {:?}!",
                     x
@@ -160,7 +163,9 @@ impl JwtSigningKeySource {
             JwtSigningKeySource::FromEnv { key, encoding } => match env::var(key) {
                 Ok(secret) => match encoding {
                     KeyEncoding::Hex => Ok(hex::decode(&secret)?),
-                    KeyEncoding::Base64 => Ok(base64::decode(&secret)?),
+                    KeyEncoding::Base64 => {
+                        Ok(base64::engine::general_purpose::STANDARD.decode(secret)?)
+                    }
                     x => Err(crate::ArboricError::general(format!(
                         "Not yet implemented: {:?}!",
                         x
@@ -187,7 +192,7 @@ fn read_file_as_hex(filename: &String) -> crate::Result<Vec<u8>> {
 
 fn read_file_as_base64(filename: &String) -> crate::Result<Vec<u8>> {
     let s = std::fs::read_to_string(filename)?;
-    Ok(base64::decode(&s)?)
+    Ok(base64::engine::general_purpose::STANDARD.decode(s)?)
 }
 
 #[cfg(test)]

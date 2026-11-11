@@ -53,7 +53,7 @@ pub fn read_yaml_configuration(filename: &str) -> crate::Result<crate::Configura
 fn read_yaml_config(f: std::fs::File) -> crate::Result<crate::Configuration> {
     use crate::abac::MatchAttribute;
 
-    let yaml_config: YamlConfig = serde_yaml::from_reader(f)?;
+    let yaml_config: YamlConfig = yaml_serde::from_reader(f)?;
 
     let mut config = Configuration::new();
     let loggers = &mut config.arboric.loggers;
@@ -329,7 +329,7 @@ arboric:
       location: "./arboric.log"
       level: trace
 "#;
-        let yaml_config: YamlConfig = serde_yaml::from_str(s).unwrap();
+        let yaml_config: YamlConfig = yaml_serde::from_str(s).unwrap();
         let arboric = yaml_config.arboric;
         let log = arboric.log;
         assert_eq!(
@@ -356,7 +356,7 @@ allow:
 - mutation: createHero
 - "*"
 "#;
-        let policy: Policy = serde_yaml::from_str(s).unwrap();
+        let policy: Policy = yaml_serde::from_str(s).unwrap();
         let allow = policy.allow.unwrap();
         assert_eq!(
             Pattern::Query(QueryDef {
@@ -390,7 +390,7 @@ allow:
   allow:
   - query: "*"
 "#;
-        let policies: Vec<Policy> = serde_yaml::from_str(s).unwrap();
+        let policies: Vec<Policy> = yaml_serde::from_str(s).unwrap();
         let first = policies.first().unwrap();
         let when = &first.when.as_ref().unwrap();
         assert_eq!(When::claim_is_present("sub"), *when.first().unwrap());
@@ -428,7 +428,7 @@ policies:
   allow:
   - query: "*"
 "#;
-        let listener: Listener = serde_yaml::from_str(s).unwrap();
+        let listener: Listener = yaml_serde::from_str(s).unwrap();
         let policies = listener.policies.unwrap();
         let first = policies.first().unwrap();
         let when = &first.when.as_ref().unwrap();
@@ -478,7 +478,7 @@ listeners:
 
     #[test]
     fn test_yaml_config_from_string() {
-        let yaml_config: YamlConfig = serde_yaml::from_str(YAML).unwrap();
+        let yaml_config: YamlConfig = yaml_serde::from_str(YAML).unwrap();
         assert!(yaml_config.arboric.log.console.is_some());
         assert_eq!(
             log::Level::Info,
@@ -518,7 +518,7 @@ listeners:
 
     #[test]
     fn test_yaml_config_jwt_from_file() {
-        let yaml_config: YamlConfig = serde_yaml::from_str(JWT_FROM_FILE_YAML).unwrap();
+        let yaml_config: YamlConfig = yaml_serde::from_str(JWT_FROM_FILE_YAML).unwrap();
         let listeners = yaml_config.listeners.unwrap();
         assert!(!listeners.is_empty());
         let listener = listeners.first().unwrap();
@@ -538,7 +538,7 @@ listeners:
         let path = std::path::PathBuf::from("etc/arboric/config.yml");
         let filename = path.canonicalize().unwrap();
         let file = std::fs::File::open(filename.as_path()).unwrap();
-        let yaml_config: YamlConfig = serde_yaml::from_reader(file).unwrap();
+        let yaml_config: YamlConfig = yaml_serde::from_reader(file).unwrap();
         assert!(yaml_config.arboric.log.console.is_some());
         assert_eq!(
             log::Level::Info,

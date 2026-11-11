@@ -46,7 +46,7 @@ pub enum ArboricError {
     YamlError {
         message: String,
         #[source]
-        cause: serde_yaml::Error,
+        cause: yaml_serde::Error,
     },
 
     #[error("{message}")]
@@ -109,8 +109,8 @@ impl From<serde_json::Error> for ArboricError {
     }
 }
 
-impl From<serde_yaml::Error> for ArboricError {
-    fn from(yaml_error: serde_yaml::Error) -> Self {
+impl From<yaml_serde::Error> for ArboricError {
+    fn from(yaml_error: yaml_serde::Error) -> Self {
         ArboricError::YamlError {
             message: format!("{:?}", yaml_error),
             cause: yaml_error,

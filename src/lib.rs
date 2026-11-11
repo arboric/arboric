@@ -22,7 +22,7 @@ pub type Claims = Map<String, serde_json::Value>;
 #[derive(Debug, PartialEq)]
 pub struct Request {
     pub claims: Claims,
-    pub document: graphql_parser::query::Document,
+    pub document: graphql_parser::query::Document<'static, String>,
 }
 
 pub type Result<T> = std::result::Result<T, ArboricError>;

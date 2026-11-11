@@ -186,7 +186,7 @@ impl Rule {
         Rule::Deny(Pattern::parse(s))
     }
 
-    pub fn matches(&self, operation_definition: &OperationDefinition) -> bool {
+    pub fn matches(&self, operation_definition: &OperationDefinition<'_, String>) -> bool {
         trace!("matches({:?}, {:?})", self, operation_definition);
         match &self {
             Rule::Allow(pattern) => pattern.matches(operation_definition),
@@ -194,7 +194,7 @@ impl Rule {
         }
     }
 
-    pub fn allows(&self, operation_definition: &OperationDefinition) -> Option<bool> {
+    pub fn allows(&self, operation_definition: &OperationDefinition<'_, String>) -> Option<bool> {
         trace!("allows({:?}, {:?}", self, operation_definition);
         match &self {
             Rule::Allow(pattern) => {
@@ -287,7 +287,9 @@ mod tests {
     fn request<C: Borrow<serde_json::Value>>(claims: C, query: &str) -> Request {
         Request {
             claims: claims.borrow().as_object().unwrap().to_owned(),
-            document: graphql_parser::parse_query(query).unwrap(),
+            document: graphql_parser::parse_query::<String>(query)
+                .unwrap()
+                .into_static(),
         }
     }
 
